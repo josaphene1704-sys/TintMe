@@ -201,17 +201,21 @@ export default function PaywallModal({
               )}
 
               {showRealCheckout && selectedProductId && (
-                <CheckoutLink
-                  className="block w-full rounded-2xl px-6 py-4 text-center font-bold text-white shadow-lg transition-all duration-300 hover:scale-[1.02] focus:outline-none"
-                  polarApi={api.polar}
-                  productIds={[selectedProductId]}
+                <div
+                  className="rounded-2xl shadow-lg"
                   style={{
                     background: "linear-gradient(135deg, #7c3aed 0%, #d946ef 50%, #fb7185 100%)",
                     boxShadow: "0 4px 20px rgba(217, 70, 239, 0.35)",
-                  } as React.CSSProperties}
+                  }}
                 >
-                  {continueLabel}
-                </CheckoutLink>
+                  <CheckoutLink
+                    className="block w-full rounded-2xl px-6 py-4 text-center font-bold text-white transition-all duration-300 hover:scale-[1.02] focus:outline-none"
+                    polarApi={api.polar}
+                    productIds={[selectedProductId]}
+                  >
+                    {continueLabel}
+                  </CheckoutLink>
+                </div>
               )}
 
               {selectedPlan !== "free" && !showRealCheckout && (

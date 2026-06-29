@@ -334,6 +334,8 @@ const T = {
     font: "var(--font-rubik), Arial, sans-serif",
     switchLabel: "العربية",
     backBtn: "אבחון חדש",
+    savedFormulaBanner: "זוהי הנוסחה האחרונה שמורה שלך",
+    savedFormulaOrder: "הזמיני מצרכים עכשיו",
     resultsBadge: "הנוסחה שלך מוכנה",
     heroTitle: "הנוסחה המותאמת עבורך",
     heroSub: "מבוססת על אבחון מקצועי של שיערך",
@@ -448,6 +450,8 @@ const T = {
     font: "var(--font-cairo), Arial, sans-serif",
     switchLabel: "עברית",
     backBtn: "تشخيص جديد",
+    savedFormulaBanner: "هذه هي تركيبتكِ الأخيرة المحفوظة",
+    savedFormulaOrder: "اطلبي المنتجات الآن",
     resultsBadge: "تركيبتكِ جاهزة",
     heroTitle: "التركيبة المخصصة لكِ",
     heroSub: "مبنية على تشخيص احترافي لشعركِ",
@@ -876,6 +880,7 @@ function FormulaInner() {
   const [showLimitBanner, setShowLimitBanner] = useState(false);
   const autoSaveRef = useRef(false);
 
+  const fromSaved  = params.get("fromSaved") === "1";
   const grayPct   = (params.get("grayPercentage") ?? "0") as string;
   const bleaching = (params.get("bleaching")      ?? "never")   as Bleaching;
   const condition = (params.get("condition")      ?? "natural") as Condition;
@@ -908,6 +913,7 @@ function FormulaInner() {
 
   // ── Auto-track free diagnosis usage ──────────────────────────────────────────
   useEffect(() => {
+    if (fromSaved) return; // viewing a saved formula — don't re-save or trigger limit
     if (!dataLoaded || authLoading || !isAuthenticated) return;
     if (currentUser === undefined) return;
     if (currentUser?.userType === "paid") return;
@@ -1172,6 +1178,28 @@ function FormulaInner() {
             {t.switchLabel}
           </button>
         </div>
+
+        {/* ── Saved formula banner ─────────────────────────────────────── */}
+        {fromSaved && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-400/40 bg-gradient-to-l from-violet-900/50 via-fuchsia-900/40 to-purple-900/50 px-4 py-3 backdrop-blur-md shadow-lg shadow-violet-900/20">
+              <button
+                type="button"
+                onClick={() => {
+                  document.getElementById("shopping-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                className="flex shrink-0 items-center gap-1.5 rounded-xl border border-violet-400/30 bg-violet-500/20 px-3 py-1.5 text-xs font-bold text-violet-200 transition-all hover:bg-violet-500/30 active:scale-95"
+              >
+                <ShoppingBag className="h-3.5 w-3.5" />
+                {t.savedFormulaOrder}
+              </button>
+              <div className="flex items-center gap-2 text-right">
+                <p className="text-sm font-semibold text-violet-200">{t.savedFormulaBanner}</p>
+                <BookmarkPlus className="h-4 w-4 shrink-0 text-violet-300" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Free limit banner ────────────────────────────────────────── */}
         {showLimitBanner && (
@@ -1599,7 +1627,7 @@ function FormulaInner() {
         </div>
 
         {/* ── Shopping list ────────────────────────────────────────────── */}
-        <div className="mb-7 overflow-hidden rounded-3xl border border-pink-400/25 bg-gradient-to-br from-[#1e0535]/80 via-pink-950/35 to-violet-950/40 shadow-2xl shadow-black/30 backdrop-blur-xl">
+        <div id="shopping-section" className="mb-7 overflow-hidden rounded-3xl border border-pink-400/25 bg-gradient-to-br from-[#1e0535]/80 via-pink-950/35 to-violet-950/40 shadow-2xl shadow-black/30 backdrop-blur-xl">
           {/* Header */}
           <div className="border-b border-pink-400/15 px-5 py-4">
             <div className="flex items-center justify-between">

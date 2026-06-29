@@ -4,9 +4,11 @@ import { useConvexAuth } from "convex/react";
 import { useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
+  ArrowLeft,
   Check,
   ClipboardList,
   Crown,
+  FlaskConical,
   ShoppingBag,
   Sparkles,
   Star,
@@ -25,6 +27,10 @@ const translations = {
   he: {
     switchLabel: "العربية",
     tagline: "המומחה האישי שלך לצבע שיער",
+    missCosBanner: "כל מוצרי הצבע שתצטרכי — במקום אחד",
+    missCosLink: "קנייה עכשיו ב-Lamis Cosmetics ←",
+    lastFormulaBtn: "חזרה לנוסחה האחרונה שלי",
+    lastFormulaSub: "צפי בנוסחה וסדרי את המצרכים",
     card1Title: "נוסחה מקצועית",
     card1Sub: "מתכוני צבע מבוססי AI המותאמים לפרופיל השיער שלך",
     card2Title: "אבחון חכם",
@@ -54,6 +60,10 @@ const translations = {
   ar: {
     switchLabel: "עברית",
     tagline: "خبيرتك الشخصية في تلوين الشعر",
+    missCosBanner: "كل منتجات التلوين التي تحتاجينها — في مكان واحد",
+    missCosLink: "تسوقي الآن في Lamis Cosmetics ←",
+    lastFormulaBtn: "العودة إلى تركيبتي الأخيرة",
+    lastFormulaSub: "اعرضي التركيبة واطلبي المنتجات",
     card1Title: "تركيبة احترافية",
     card1Sub: "وصفات تلوين بالذكاء الاصطناعي مخصصة لملف شعرك",
     card2Title: "تشخيص ذكي",
@@ -127,6 +137,7 @@ export default function Home() {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { signOut } = useAuthActions();
   const formulaCount = useQuery(api.formulas.getCount);
+  const latestFormula = useQuery(api.formulas.getLatest);
   const currentUser = useQuery(api.users.getCurrentUser);
   const updateUserType = useMutation(api.users.updateUserType);
 
@@ -170,6 +181,29 @@ export default function Home() {
 
     // count === 0 — first free diagnosis
     router.push("/page1");
+  }
+
+  function handleViewLastFormula() {
+    if (!latestFormula) return;
+    localStorage.setItem("tintme_lang", lang);
+    if (latestFormula.currentShadeCode) {
+      localStorage.setItem("tintme_current_shade", latestFormula.currentShadeCode);
+    } else {
+      localStorage.removeItem("tintme_current_shade");
+    }
+    if (latestFormula.desiredShadeCode) {
+      localStorage.setItem("tintme_desired_shade", latestFormula.desiredShadeCode);
+    } else {
+      localStorage.removeItem("tintme_desired_shade");
+    }
+    const params = new URLSearchParams({
+      grayPercentage: latestFormula.grayPercentage,
+      bleaching: latestFormula.bleachingHistory,
+      condition: latestFormula.hairCondition,
+      hairLength: latestFormula.hairLength,
+      fromSaved: "1",
+    });
+    router.push(`/page3?${params.toString()}`);
   }
 
   async function handleMockUpgrade() {
@@ -276,8 +310,24 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Miss Cosmetics Partner Banner */}
+        <a
+          href="https://www.lamis-cosmetics.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group mt-6 flex items-center justify-between gap-3 rounded-2xl border border-pink-400/30 bg-gradient-to-l from-rose-500/10 via-pink-500/10 to-fuchsia-500/10 p-4 backdrop-blur-md shadow-md shadow-rose-900/20 transition-all duration-300 hover:border-pink-400/60 hover:from-rose-500/20 hover:via-pink-500/15 hover:to-fuchsia-500/15 hover:shadow-pink-900/30"
+        >
+          <ShoppingBag className="h-5 w-5 shrink-0 text-pink-300 transition-transform duration-300 group-hover:scale-110" />
+          <div className="flex-1 text-right">
+            <p className="text-sm font-semibold text-white/85">{t.missCosBanner}</p>
+            <p className="mt-0.5 text-xs font-bold text-pink-300 group-hover:text-pink-200 transition-colors">
+              {t.missCosLink}
+            </p>
+          </div>
+        </a>
+
         {/* CTA */}
-        <div className="mt-10">
+        <div className="mt-6">
           <button
             type="button"
             onClick={handleStart}
@@ -290,6 +340,24 @@ export default function Home() {
             </span>
           </button>
         </div>
+
+        {/* Last Formula shortcut — visible when user has at least one saved formula */}
+        {isAuthenticated && latestFormula && (
+          <button
+            type="button"
+            onClick={handleViewLastFormula}
+            className="group mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-violet-400/30 bg-white/5 px-5 py-3.5 backdrop-blur-md transition-all duration-300 hover:border-violet-400/60 hover:bg-white/10 active:scale-[0.98]"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0 text-violet-300 transition-transform duration-300 group-hover:-translate-x-1" />
+            <div className="flex-1 text-right">
+              <p className="text-sm font-bold text-white/90">{t.lastFormulaBtn}</p>
+              <p className="mt-0.5 text-xs text-white/45">{t.lastFormulaSub}</p>
+            </div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-400/25 bg-violet-500/15">
+              <FlaskConical className="h-4 w-4 text-violet-300" />
+            </div>
+          </button>
+        )}
 
         {/* ── Paywall Alert ──────────────────────────────────────────────────── */}
         {showPaywallAlert && (

@@ -42,6 +42,20 @@ export const listMine = query({
   },
 });
 
+export const getLatest = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const results = await ctx.db
+      .query("formulas")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .first();
+    return results ?? null;
+  },
+});
+
 export const getCount = query({
   args: {},
   handler: async (ctx) => {

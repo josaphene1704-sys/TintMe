@@ -19,10 +19,13 @@ This document outlines the professional logic for calculating hair dye formulas 
 - Standard Color Logic (Dyeing same level / Darker / Gray coverage):
   * Mixing Ratio: 1:1 (e.g., 60g Target Color + 60g Developer = 120g total mixture).
   * Developer: 3% or 6% based on gray hair and depth.
-- High-Lift / Bleaching Logic (Lifting 3+ Levels with 12% Developer):
+- High-Lift / Bleaching Logic (Lifting 3+ Levels):
   * Mixing Ratio: 1:2 — Developer amount is ALWAYS double the bleach/color powder amount (e.g., 40g Bleach Powder + 80g Developer = 120g total mixture).
-  * Developer: 12% for high-lift. The 1:2 mixing ratio (developer double the powder) is mandatory for ALL developer strengths when mixing with bleach powder.
-  * Display a special warning for precise application.
+  * Developer strength depends on hair history — CRITICAL RULE:
+    - 12% Developer: ONLY for natural, healthy hair (never colored, never bleached, not damaged).
+    - 9% Developer: for previously COLORED hair that needs a 3-level lift. NEVER apply 12% over colored hair.
+    - The 1:2 mixing ratio (developer double the powder) is mandatory for BOTH strengths when mixing with bleach powder.
+  * Display a special warning for precise application, stating the exact developer strength chosen (12% natural-only / 9% colored hair).
 
 ## 4. Hair Length Scaling (Question 4 in Diagnostic)
 Hair Length is the 4th diagnostic question and scales ALL gram amounts proportionally.

@@ -358,10 +358,10 @@ const T = {
     ratioStandard: "1:1 – כמות שווה",
     ratioHighLift: "1:2 – חמצן כפול!",
     developerNote3: "טונר בלבד – שיער מולבן לאחרונה",
-    developerNote6: "כיסוי / צביעה ברמה זהה",
-    developerNote9: "הבהרה על שיער צבוע / עד 3 רמות",
-    developerNote12: "הבהרה של 3+ רמות – יחס 1:2",
-    highLiftAlert: "⚠️ יחס 1:2 – כמות החמצן כפולה מאבקת ההבהרה. חובה להשתמש בחמצן 12% בלבד.",
+    developerNote6: "כיסוי / רמה זהה / הבהרה עדינה עד 2 רמות",
+    developerNote9: "הבהרה על שיער צבוע – אסור 12% על שיער צבוע",
+    developerNote12: "הבהרה של 3+ רמות – שיער טבעי ובריא בלבד",
+    highLiftAlert: "⚠️ יחס 1:2 – כמות החמצן כפולה מאבקת ההבהרה. חובה להשתמש בחמצן {DEV_PCT}% בלבד.",
     lengthBadgeLong: "הכמויות הוכפלו אוטומטית לשיער ארוך",
     lengthBadgeShort: "הכמויות מותאמות לשיער קצר / בינוני",
     bleachingComponent: "חומר הבהרה – שלב 1",
@@ -380,7 +380,8 @@ const T = {
     // Warnings
     warningDamaged: "שיער פגום זוהה – הפחיתי חמצן על האורכים ועשי טיפול מזין לפני הצביעה.",
     warningBleach: "שיער מולבן לאחרונה – אין להשתמש בצבע קבוע. השתמשי בטונר עם חמצן נמוך (1.9%–3%) בלבד.",
-    warningLift: "נדרשת הבהרה של 3+ רמות – תהליך High-Lift עם חמצן 12%. מיועד לשיער טבעי בלבד.",
+    warningLift12: "נדרשת הבהרה של 3+ רמות – תהליך High-Lift עם חמצן 12%. מיועד לשיער טבעי ובריא בלבד.",
+    warningLift9: "נדרשת הבהרה של 3+ רמות על שיער צבוע – תהליך High-Lift עם חמצן 9% בלבד. אסור להשתמש ב-12% על שיער צבוע!",
     warningTitle: "שים לב – אזהרה מקצועית",
     specialShadeTitle: "גוון מיוחד – נדרש שיער מוסבן",
     specialShadeSilver: "סדרת סילבר",
@@ -473,10 +474,10 @@ const T = {
     ratioStandard: "1:1 – كمية متساوية",
     ratioHighLift: "1:2 – أكسجين مضاعف!",
     developerNote3: "تونر فقط – شعر مفتح حديثاً",
-    developerNote6: "تغطية / تلوين بنفس المستوى",
-    developerNote9: "تفتيح على شعر مصبوغ / حتى 3 مستويات",
-    developerNote12: "تفتيح 3+ مستويات – نسبة 1:2",
-    highLiftAlert: "⚠️ نسبة 1:2 – كمية الأكسجين ضعف اللون. يجب استخدام أكسجين 12% فقط.",
+    developerNote6: "تغطية / نفس المستوى / تفتيح خفيف حتى مستويين",
+    developerNote9: "تفتيح على شعر مصبوغ – يُمنع 12% على الشعر المصبوغ",
+    developerNote12: "تفتيح 3+ مستويات – للشعر الطبيعي والصحي فقط",
+    highLiftAlert: "⚠️ نسبة 1:2 – كمية الأكسجين ضعف مسحوق التفتيح. يجب استخدام أكسجين {DEV_PCT}% فقط.",
     lengthBadgeLong: "تم مضاعفة الكميات تلقائياً للشعر الطويل",
     lengthBadgeShort: "الكميات مناسبة للشعر القصير / المتوسط",
     bleachingComponent: "مكون التفتيح – المرحلة 1",
@@ -493,7 +494,8 @@ const T = {
     processTimeUnit: "دقيقة",
     warningDamaged: "تم الكشف عن شعر تالف – قللي الأكسجين على الأطراف وضعي علاجاً مغذياً قبل التلوين.",
     warningBleach: "شعر مفتح حديثاً – لا تستخدمي لوناً دائماً. استخدمي تونر بأكسجين منخفض (1.9%–3%) فقط.",
-    warningLift: "مطلوب تفتيح 3+ مستويات – عملية High-Lift بأكسجين 12%. مخصصة للشعر الطبيعي فقط.",
+    warningLift12: "مطلوب تفتيح 3+ مستويات – عملية High-Lift بأكسجين 12%. مخصصة للشعر الطبيعي والصحي فقط.",
+    warningLift9: "مطلوب تفتيح 3+ مستويات على شعر مصبوغ – عملية High-Lift بأكسجين 9% فقط. يُمنع استخدام 12% على الشعر المصبوغ!",
     warningTitle: "انتبهي – تحذير مهني",
     specialShadeTitle: "درجة خاصة – يتطلب شعراً مفتحاً",
     specialShadeSilver: "سلسلة سيلفر",
@@ -590,8 +592,10 @@ function calcDeveloper(
   const dest = destCode ? getLevel(destCode) : null;
   if (!curr || !dest) return 6;
   const lift = dest - curr;
-  if (lift >= 3) return condition === "natural" ? 12 : 9;
-  if (lift === 2) return 9;
+  // 12% is allowed ONLY on natural, healthy hair with no bleaching history.
+  // Colored / previously-treated hair lifting 3+ levels gets 9% (never 12%).
+  if (lift >= 3) return condition === "natural" && bleaching === "never" ? 12 : 9;
+  // Subtle lift (1–2 levels): developer remains 6% per the color rules (not high-lift).
   if (lift < -1 && condition === "natural") return 3;
   return 6;
 }
@@ -1053,9 +1057,9 @@ function FormulaInner() {
         gramsAr: gar(mix.primaryGrams * gramMultiplier),
       });
       items.push({
-        id: "dev-12",
-        labelHe: "קרם חמצן 12%",
-        labelAr: "كريم أكسجين 12%",
+        id: "dev-lift",
+        labelHe: `קרם חמצן ${devPct}%`,
+        labelAr: `كريم أكسجين ${devPct}%`,
         gramsHe: g(mix.developerGrams * gramMultiplier),
         gramsAr: gar(mix.developerGrams * gramMultiplier),
       });
@@ -1271,7 +1275,7 @@ function FormulaInner() {
                   {t.warningTitle}
                 </p>
                 <p className={cn("mt-0.5 text-xs leading-relaxed", showBleachWarn ? "text-red-200/75" : "text-amber-200/75")}>
-                  {showBleachWarn ? t.warningBleach : showLiftWarn ? t.warningLift : t.warningDamaged}
+                  {showBleachWarn ? t.warningBleach : showLiftWarn ? (devPct === 12 ? t.warningLift12 : t.warningLift9) : t.warningDamaged}
                 </p>
               </div>
             </div>
@@ -1403,7 +1407,7 @@ function FormulaInner() {
             {mix.isHighLift && (
               <div className="flex items-center gap-2.5 rounded-xl border border-amber-400/30 bg-amber-500/12 px-4 py-2.5">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-300" />
-                <p className="text-xs leading-relaxed text-amber-200/85">{t.highLiftAlert}</p>
+                <p className="text-xs leading-relaxed text-amber-200/85">{t.highLiftAlert.replace("{DEV_PCT}", String(devPct))}</p>
               </div>
             )}
 

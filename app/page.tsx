@@ -1,7 +1,7 @@
 "use client";
 
 import { useConvexAuth } from "convex/react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -17,7 +17,6 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import PaywallModal from "@/components/payments/PaywallModal";
 import { PLAN_DISPLAY } from "@/config/planDisplay";
 import { api } from "@/convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -139,10 +138,11 @@ export default function Home() {
   const formulaCount = useQuery(api.formulas.getCount);
   const latestFormula = useQuery(api.formulas.getLatest);
   const currentUser = useQuery(api.users.getCurrentUser);
-  const updateUserType = useMutation(api.users.updateUserType);
+  const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
 
   const [showPaywallAlert, setShowPaywallAlert] = useState(false);
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
+  const [buyingPlan, setBuyingPlan] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
 
   const packagesRef = useRef<HTMLDivElement>(null);
   const paywallAlertRef = useRef<HTMLDivElement>(null);
@@ -206,11 +206,48 @@ export default function Home() {
     router.push(`/page3?${params.toString()}`);
   }
 
-  async function handleMockUpgrade() {
-    await updateUserType({ userType: "paid" });
+  // רכישת חבילה — מפנה ישירות ל-Polar Checkout של המוצר הנבחר
+  async function handleBuy(planId: string, productId: string | undefined) {
+    setCheckoutError("");
+
+    if (!isAuthenticated) {
+      localStorage.setItem("tintme_lang", lang);
+      router.push("/sign-in");
+      return;
+    }
+
+    if (!productId) {
+      setCheckoutError(
+        lang === "he"
+          ? "החבילה אינה מוגדרת כרגע. נסי שוב מאוחר יותר."
+          : "الباقة غير مهيأة حالياً. حاولي لاحقاً."
+      );
+      return;
+    }
+
+    try {
+      setBuyingPlan(planId);
+      const { url } = await generateCheckoutLink({
+        productIds: [productId],
+        origin: window.location.origin,
+        successUrl: `${window.location.origin}/success`,
+      });
+      window.location.href = url;
+    } catch {
+      setBuyingPlan(null);
+      setCheckoutError(
+        lang === "he"
+          ? "אירעה שגיאה ביצירת הקישור לתשלום. נסי שוב."
+          : "حدث خطأ أثناء إنشاء رابط الدفع. حاولي مرة أخرى."
+      );
+    }
   }
 
   const ctaLabel = isAuthenticated && !isBlocked ? t.ctaStart : t.cta;
+
+  const PACK_1_ID = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_1;
+  const PACK_3_ID = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_3;
+  const PACK_30_ID = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_30;
 
   return (
     <div dir="rtl" className="relative min-h-screen overflow-hidden" style={{ fontFamily: t.font }}>
@@ -403,19 +440,16 @@ export default function Home() {
             <p className="mt-1 text-sm text-white/50">{t.packagesSub}</p>
           </div>
 
-          {/* Plan cards — 1 col mobile / 2 col tablet+ */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* Monthly */}
+          {/* Plan cards — 1 col mobile / 3 col tablet+ */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {/* Pack 1 */}
             <div className="relative rounded-2xl border border-white/15 bg-white/8 p-5 backdrop-blur-md">
               <div className="flex items-start justify-between gap-3">
                 <div className="text-right">
-                  <p className="font-bold text-lg text-white">{PLAN_DISPLAY.monthly.title}</p>
-                  <p className="text-white/50 text-sm">{PLAN_DISPLAY.monthly.subtitle}</p>
+                  <p className="font-bold text-lg text-white">{PLAN_DISPLAY.pack_1.title}</p>
+                  <p className="text-white/50 text-sm">{PLAN_DISPLAY.pack_1.subtitle}</p>
                   <p className="mt-2 text-3xl font-extrabold text-white">
-                    {PLAN_DISPLAY.monthly.priceLine}
-                    <span className="text-sm font-normal text-white/50 mr-1">
-                      / {PLAN_DISPLAY.monthly.subtitle}
-                    </span>
+                    {PLAN_DISPLAY.pack_1.priceLine}
                   </p>
                 </div>
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-400/30 bg-violet-500/20">
@@ -432,16 +466,16 @@ export default function Home() {
               </ul>
               <button
                 type="button"
-                onClick={() => setShowPaywallModal(true)}
-                className="mt-5 w-full rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold text-white transition-all hover:bg-white/20 active:scale-95"
+                onClick={() => handleBuy("pack_1", PACK_1_ID)}
+                disabled={buyingPlan !== null}
+                className="mt-5 w-full rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold text-white transition-all hover:bg-white/20 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {t.upgradeBtn}
+                {buyingPlan === "pack_1" ? "..." : t.upgradeBtn}
               </button>
             </div>
 
-            {/* Yearly — recommended */}
+            {/* Pack 3 — recommended */}
             <div className="relative rounded-2xl border-2 border-fuchsia-400/60 bg-gradient-to-br from-fuchsia-900/40 via-violet-900/30 to-purple-900/40 p-5 backdrop-blur-md shadow-lg shadow-fuchsia-900/30">
-              {/* Recommended badge */}
               <div className="absolute -top-3 right-5 flex items-center gap-1.5 rounded-full bg-gradient-to-l from-fuchsia-500 to-violet-600 px-3 py-1 shadow-md">
                 <Star className="h-3 w-3 text-white" fill="white" />
                 <span className="text-white text-xs font-bold">{t.recommendedBadge}</span>
@@ -449,13 +483,10 @@ export default function Home() {
 
               <div className="flex items-start justify-between gap-3 pt-1">
                 <div className="text-right">
-                  <p className="font-bold text-lg text-white">{PLAN_DISPLAY.yearly.title}</p>
-                  <p className="text-white/50 text-sm">{PLAN_DISPLAY.yearly.subtitle}</p>
+                  <p className="font-bold text-lg text-white">{PLAN_DISPLAY.pack_3.title}</p>
+                  <p className="text-white/50 text-sm">{PLAN_DISPLAY.pack_3.subtitle}</p>
                   <p className="mt-2 text-3xl font-extrabold text-white">
-                    {PLAN_DISPLAY.yearly.priceLine}
-                    <span className="text-sm font-normal text-white/50 mr-1">
-                      / {PLAN_DISPLAY.yearly.subtitle}
-                    </span>
+                    {PLAN_DISPLAY.pack_3.priceLine}
                   </p>
                 </div>
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/20">
@@ -472,26 +503,57 @@ export default function Home() {
               </ul>
               <button
                 type="button"
-                onClick={() => setShowPaywallModal(true)}
-                className="group mt-5 w-full overflow-hidden rounded-xl bg-gradient-to-l from-[#7b2ff7] via-[#d4148c] to-[#f72585] py-3 text-sm font-bold text-white shadow-lg shadow-fuchsia-900/40 transition-all hover:scale-[1.02] active:scale-[0.97]"
+                onClick={() => handleBuy("pack_3", PACK_3_ID)}
+                disabled={buyingPlan !== null}
+                className="group mt-5 w-full overflow-hidden rounded-xl bg-gradient-to-l from-[#7b2ff7] via-[#d4148c] to-[#f72585] py-3 text-sm font-bold text-white shadow-lg shadow-fuchsia-900/40 transition-all hover:scale-[1.02] active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {t.upgradeBtn}
+                {buyingPlan === "pack_3" ? "..." : t.upgradeBtn}
+              </button>
+            </div>
+
+            {/* Pack 30 */}
+            <div className="relative rounded-2xl border border-white/15 bg-white/8 p-5 backdrop-blur-md">
+              <div className="flex items-start justify-between gap-3">
+                <div className="text-right">
+                  <p className="font-bold text-lg text-white">{PLAN_DISPLAY.pack_30.title}</p>
+                  <p className="text-white/50 text-sm">{PLAN_DISPLAY.pack_30.subtitle}</p>
+                  <p className="mt-2 text-3xl font-extrabold text-white">
+                    {PLAN_DISPLAY.pack_30.priceLine}
+                  </p>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-pink-400/30 bg-pink-500/20">
+                  <FlaskConical className="h-5 w-5 text-pink-300" />
+                </div>
+              </div>
+              <ul className="mt-4 space-y-2">
+                {t.monthlyFeatures.map((feature) => (
+                  <li key={feature} className="flex items-center gap-2.5">
+                    <Check className="h-4 w-4 shrink-0 text-fuchsia-400" />
+                    <span className="text-sm text-white/75">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => handleBuy("pack_30", PACK_30_ID)}
+                disabled={buyingPlan !== null}
+                className="mt-5 w-full rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold text-white transition-all hover:bg-white/20 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {buyingPlan === "pack_30" ? "..." : t.upgradeBtn}
               </button>
             </div>
           </div>
+
+          {checkoutError && (
+            <div className="mt-4 rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
+              {checkoutError}
+            </div>
+          )}
         </div>
         {/* /packages */}
 
         </div>{/* /inner max-w container */}
       </div>
-
-      {/* ── Paywall Modal ──────────────────────────────────────────────────────── */}
-      <PaywallModal
-        open={showPaywallModal}
-        onOpenChange={setShowPaywallModal}
-        onMockUpgradeToPaid={handleMockUpgrade}
-      />
-
     </div>
   );
 }

@@ -9,14 +9,19 @@ export const PLAN_DISPLAY = {
     title: "חינם",
     subtitle: "כל מה שצריך כדי להתחיל",
   },
-  monthly: {
-    title: "חודשי",
-    priceLine: "₪29",
-    subtitle: "למשתמש לחודש",
+  pack_1: {
+    title: "אבחון 1",
+    priceLine: "₪19",
+    subtitle: "אבחון בודד",
   },
-  yearly: {
-    title: "שנתי",
-    priceLine: "₪290",
-    subtitle: "למשתמש לשנה",
+  pack_3: {
+    title: "3 אבחונים",
+    priceLine: "₪49",
+    subtitle: "חבילת שלישייה",
+  },
+  pack_30: {
+    title: "30 אבחונים",
+    priceLine: "₪149",
+    subtitle: "חבילה מורחבת",
   },
 } as const;

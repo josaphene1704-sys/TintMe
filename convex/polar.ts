@@ -29,8 +29,9 @@ export const polar = new Polar(components.polar, {
 
   // מיפוי מפתחות לProduct IDs
   products: {
-    premiumMonthly: process.env.NEXT_PUBLIC_POLAR_MONTHLY_PRODUCT_ID || "",
-    premiumYearly: process.env.NEXT_PUBLIC_POLAR_YEARLY_PRODUCT_ID || "",
+    pack1: process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_1 || "",
+    pack3: process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_3 || "",
+    pack30: process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_30 || "",
   },
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckoutLink } from "@convex-dev/polar/react";
-import { useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { Check, ChevronRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,20 +19,35 @@ import { PLAN_DISPLAY } from "@/config/planDisplay";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
-export type PaywallPlanId = "free" | "monthly" | "yearly";
+export type PaywallPlanId = "free" | "pack_1" | "pack_3" | "pack_30";
 
 type PaywallModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onMockUpgradeToPaid?: () => Promise<void> | void;
   preview?: boolean;
+  hasUsedFree?: boolean;
 };
 
 const FEATURES_FREE: string[] = ["אבחון בסיסי אחד (להתחלה)"];
 
-const FEATURES_PAID: string[] = [
+const FEATURES_PACK_1: string[] = [
   "אבחון צבע מקצועי ומלא",
   "פורמולה מותאמת אישית",
+  "רשימת קנייה חכמה",
+  "גישה לקטלוג גוונים מלא",
+];
+
+const FEATURES_PACK_3: string[] = [
+  "3 אבחונים מקצועיים",
+  "פורמולה מותאמת אישית לכל אבחון",
+  "רשימת קנייה חכמה",
+  "גישה לקטלוג גוונים מלא",
+];
+
+const FEATURES_PACK_30: string[] = [
+  "30 אבחונים מקצועיים",
+  "פורמולה מותאמת אישית לכל אבחון",
   "רשימת קנייה חכמה",
   "גישה לקטלוג גוונים מלא",
 ];
@@ -42,17 +57,18 @@ export default function PaywallModal({
   onOpenChange,
   onMockUpgradeToPaid,
   preview,
+  hasUsedFree = false,
 }: PaywallModalProps) {
   const router = useRouter();
-  const [selectedPlan, setSelectedPlan] = useState<PaywallPlanId>("yearly");
+  const [selectedPlan, setSelectedPlan] = useState<PaywallPlanId>("pack_3");
   const [error, setError] = useState<string>("");
 
   const isPreviewMode = Boolean(preview && IS_DEV_MODE);
+  const { isAuthenticated } = useConvexAuth();
 
-  const products = useQuery(api.polar.getConfiguredProducts);
-
-  const monthlyProductId = products?.premiumMonthly?.id;
-  const yearlyProductId = products?.premiumYearly?.id;
+  const pack1ProductId = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_1;
+  const pack3ProductId = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_3;
+  const pack30ProductId = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID_30;
 
   const handleBack = () => {
     onOpenChange(false);
@@ -61,16 +77,25 @@ export default function PaywallModal({
 
   const continueLabel = useMemo(() => {
     if (selectedPlan === "free") return "המשיכי בחינם";
+    if (selectedPlan === "pack_1") return "רכשי אבחון 1";
+    if (selectedPlan === "pack_3") return "רכשי 3 אבחונים";
+    if (selectedPlan === "pack_30") return "רכשי 30 אבחונים";
     return "המשיכי";
   }, [selectedPlan]);
 
   const handleFreeContinue = () => {
     setError("");
     onOpenChange(false);
+    router.push("/page1");
   };
 
   const handleMockContinue = async () => {
     setError("");
+    if (!isAuthenticated) {
+      onOpenChange(false);
+      router.push("/sign-in");
+      return;
+    }
     if (MOCK_PAYMENTS && onMockUpgradeToPaid) {
       await onMockUpgradeToPaid();
       onOpenChange(false);
@@ -82,20 +107,25 @@ export default function PaywallModal({
   };
 
   const selectedProductId = useMemo(() => {
-    if (selectedPlan === "monthly") return monthlyProductId;
-    if (selectedPlan === "yearly") return yearlyProductId;
+    if (selectedPlan === "pack_1") return pack1ProductId;
+    if (selectedPlan === "pack_3") return pack3ProductId;
+    if (selectedPlan === "pack_30") return pack30ProductId;
     return;
-  }, [selectedPlan, monthlyProductId, yearlyProductId]);
+  }, [selectedPlan, pack1ProductId, pack3ProductId, pack30ProductId]);
 
   const hasProductConfigured = selectedPlan === "free" || Boolean(selectedProductId);
 
   const showRealCheckout =
-    PAYMENT_SYSTEM_ENABLED && !isPreviewMode && selectedPlan !== "free" && hasProductConfigured;
+    PAYMENT_SYSTEM_ENABLED &&
+    !isPreviewMode &&
+    isAuthenticated &&
+    selectedPlan !== "free" &&
+    hasProductConfigured;
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
-        className="border-0 bg-transparent p-0 sm:max-w-3xl shadow-2xl"
+        className="border-0 bg-transparent p-0 sm:max-w-4xl shadow-2xl"
         hideCloseButton={!isPreviewMode}
       >
         {/* Gradient background matching TintMe branding */}
@@ -143,33 +173,52 @@ export default function PaywallModal({
               </p>
             </DialogHeader>
 
-            <div className="relative grid grid-cols-1 gap-4 md:grid-cols-3">
+            {hasUsedFree && (
+              <div className="mb-4 rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 text-center text-sm text-pink-200">
+                ניצלת את האבחון החינמי שלך — בחרי חבילה להמשיך
+              </div>
+            )}
+
+            <div className="relative grid grid-cols-1 gap-4 md:grid-cols-4">
               <PlanCard
+                disabled={hasUsedFree}
                 features={FEATURES_FREE}
-                onSelect={setSelectedPlan}
+                onSelect={(plan) => {
+                  if (!hasUsedFree) setSelectedPlan(plan);
+                }}
                 planId="free"
                 selectedPlan={selectedPlan}
                 subtitle={PLAN_DISPLAY.free.subtitle}
                 title={PLAN_DISPLAY.free.title}
+                usedLabel={hasUsedFree ? "נוצל" : undefined}
               />
               <PlanCard
-                features={FEATURES_PAID}
+                features={FEATURES_PACK_1}
                 onSelect={setSelectedPlan}
-                planId="monthly"
-                priceLine={PLAN_DISPLAY.monthly.priceLine}
+                planId="pack_1"
+                priceLine={PLAN_DISPLAY.pack_1.priceLine}
                 selectedPlan={selectedPlan}
-                subtitle={PLAN_DISPLAY.monthly.subtitle}
-                title={PLAN_DISPLAY.monthly.title}
+                subtitle={PLAN_DISPLAY.pack_1.subtitle}
+                title={PLAN_DISPLAY.pack_1.title}
               />
               <PlanCard
-                features={FEATURES_PAID}
+                features={FEATURES_PACK_3}
                 isRecommended={true}
                 onSelect={setSelectedPlan}
-                planId="yearly"
-                priceLine={PLAN_DISPLAY.yearly.priceLine}
+                planId="pack_3"
+                priceLine={PLAN_DISPLAY.pack_3.priceLine}
                 selectedPlan={selectedPlan}
-                subtitle={PLAN_DISPLAY.yearly.subtitle}
-                title={PLAN_DISPLAY.yearly.title}
+                subtitle={PLAN_DISPLAY.pack_3.subtitle}
+                title={PLAN_DISPLAY.pack_3.title}
+              />
+              <PlanCard
+                features={FEATURES_PACK_30}
+                onSelect={setSelectedPlan}
+                planId="pack_30"
+                priceLine={PLAN_DISPLAY.pack_30.priceLine}
+                selectedPlan={selectedPlan}
+                subtitle={PLAN_DISPLAY.pack_30.subtitle}
+                title={PLAN_DISPLAY.pack_30.title}
               />
             </div>
 
@@ -186,7 +235,7 @@ export default function PaywallModal({
             )}
 
             <div className="relative mt-6">
-              {selectedPlan === "free" && (
+              {selectedPlan === "free" && !hasUsedFree && (
                 <button
                   className="w-full rounded-2xl px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-pink-500/30 focus:outline-none"
                   onClick={handleFreeContinue}
@@ -272,6 +321,8 @@ type PlanCardProps = {
   selectedPlan: PaywallPlanId;
   onSelect: (plan: PaywallPlanId) => void;
   isRecommended?: boolean;
+  disabled?: boolean;
+  usedLabel?: string;
 };
 
 function PlanCard({
@@ -283,6 +334,8 @@ function PlanCard({
   selectedPlan,
   onSelect,
   isRecommended,
+  disabled = false,
+  usedLabel,
 }: PlanCardProps) {
   const isSelected = selectedPlan === planId;
 
@@ -290,21 +343,25 @@ function PlanCard({
     <button
       className={cn(
         "relative rounded-2xl p-5 text-right transition-all duration-300",
-        "hover:scale-[1.02]",
-        isSelected
+        disabled
+          ? "cursor-not-allowed opacity-40"
+          : "hover:scale-[1.02]",
+        isSelected && !disabled
           ? "ring-2 ring-pink-400/70"
-          : "ring-1 ring-purple-700/40 hover:ring-purple-500/60"
+          : "ring-1 ring-purple-700/40",
+        !disabled && !isSelected && "hover:ring-purple-500/60"
       )}
+      disabled={disabled}
       onClick={() => onSelect(planId)}
       style={{
-        background: isSelected
+        background: isSelected && !disabled
           ? "linear-gradient(145deg, rgba(124,58,237,0.25) 0%, rgba(217,70,239,0.15) 100%)"
           : "rgba(255,255,255,0.04)",
-        boxShadow: isSelected ? "0 0 24px rgba(217, 70, 239, 0.2)" : "none",
+        boxShadow: isSelected && !disabled ? "0 0 24px rgba(217, 70, 239, 0.2)" : "none",
       }}
       type="button"
     >
-      {isRecommended && (
+      {isRecommended && !disabled && (
         <div
           className="-top-3 absolute right-4 flex items-center gap-1 rounded-full px-3 py-1 font-bold text-white text-xs"
           style={{
@@ -317,15 +374,24 @@ function PlanCard({
         </div>
       )}
 
+      {usedLabel && (
+        <div
+          className="-top-3 absolute right-4 rounded-full px-3 py-1 font-bold text-white text-xs"
+          style={{ background: "linear-gradient(135deg, #6b7280, #9ca3af)" }}
+        >
+          {usedLabel}
+        </div>
+      )}
+
       {/* Selection indicator */}
       <div
         aria-hidden="true"
         className={cn(
           "absolute top-4 left-4 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-200",
-          isSelected ? "border-pink-400 bg-pink-400" : "border-purple-600"
+          isSelected && !disabled ? "border-pink-400 bg-pink-400" : "border-purple-600"
         )}
       >
-        {isSelected && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
+        {isSelected && !disabled && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
       </div>
 
       <div className="mb-3 mt-1">

@@ -38,13 +38,13 @@ export const PAYWALL_ENABLED = true;
 // דגל תשלומים מדומים (רק לפיתוח)
 // אם true: לחיצה על "המשך" בתוכנית בתשלום תדמה שדרוג ל"בתשלום" בלי Polar Checkout
 // אם false: לחיצה על "המשך" תנסה לבצע Redirect ל-Polar Checkout (אם PAYMENT_SYSTEM_ENABLED דולק)
-export const MOCK_PAYMENTS = true;
+export const MOCK_PAYMENTS = false;
 
 // 🚨 קריטי: דגל זה קובע האם מערכת התשלומים האמיתית פעילה
 // אם false: לחיצה על "המשך" תציג הודעת Preview (או תדמה שדרוג אם MOCK_PAYMENTS דולק)
 // אם true: לחיצה על "המשך" תבצע Redirect ל-Polar Checkout (דורש הגדרת Product IDs)
 // הערה: Paywall יוצג בכל מקרה אם PAYWALL_ENABLED דולק - הדגל הזה רק קובע מה קורה בלחיצה
-export const PAYMENT_SYSTEM_ENABLED = false;
+export const PAYMENT_SYSTEM_ENABLED = true;
 
 // ============================================================================
 // קישורי תנאי שימוש ומדיניות פרטיות

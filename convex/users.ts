@@ -8,31 +8,28 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 export const _getCurrentUserForPolar = internalQuery({
   args: {},
   handler: async (ctx): Promise<{ userId: Id<"users">; email: string } | null> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) {
-      return null;
-    }
-
-    const subjectParts = identity.subject.split("|");
-    if (subjectParts.length >= 2) {
-      const userId = subjectParts[1] as Id<"users">;
-      try {
-        const user = await ctx.db.get(userId);
-        if (user) {
-          return { userId: user._id, email: user.email };
-        }
-      } catch {
-        // ID לא תקין
+    // שימוש ב-getAuthUserId — אותה שיטה אמינה שעובדת ב-getCurrentUser
+    const userId = await getAuthUserId(ctx);
+    if (userId) {
+      const user = await ctx.db.get(userId);
+      if (user) {
+        return { userId: user._id, email: user.email };
       }
     }
 
-    // Fallback: חיפוש לפי אימייל
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
-      .unique();
+    // Fallback: חיפוש לפי אימייל מה-identity
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity?.email) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
+        .unique();
+      if (user) {
+        return { userId: user._id, email: user.email };
+      }
+    }
 
-    return user ? { userId: user._id, email: user.email } : null;
+    return null;
   },
 });
 
@@ -237,6 +234,34 @@ export const resetAllUsersToFreePublic = mutation({
     }
 
     return { resetUsers, deletedFormulas: formulas.length };
+  },
+});
+
+// ============================================================================
+// מחיקת כל הנתונים (איפוס מלא)
+// ============================================================================
+
+// מוחק את כל האבחונים (formulas) וכל הלקוחות (users)
+// לאחר המחיקה, כל מי שנרשם מחדש יקבל אבחון חינמי אחד
+export const clearAllData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // מחיקת כל הנוסחאות/אבחונים
+    const formulas = await ctx.db.query("formulas").collect();
+    for (const formula of formulas) {
+      await ctx.db.delete(formula._id);
+    }
+
+    // מחיקת כל הלקוחות מטבלת users
+    const users = await ctx.db.query("users").collect();
+    for (const user of users) {
+      await ctx.db.delete(user._id);
+    }
+
+    return {
+      deletedFormulas: formulas.length,
+      deletedUsers: users.length,
+    };
   },
 });
 

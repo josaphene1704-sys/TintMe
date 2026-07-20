@@ -382,6 +382,7 @@ const T = {
     warningBleach: "שיער מולבן לאחרונה – אין להשתמש בצבע קבוע. השתמשי בטונר עם חמצן נמוך (1.9%–3%) בלבד.",
     warningLift12: "נדרשת הבהרה של 3+ רמות – תהליך High-Lift עם חמצן 12%. מיועד לשיער טבעי ובריא בלבד.",
     warningLift9: "נדרשת הבהרה של 3+ רמות על שיער צבוע – תהליך High-Lift עם חמצן 9% בלבד. אסור להשתמש ב-12% על שיער צבוע!",
+    warningNeutralization: "זוהה צורך בניטרול צהוב / כתום – תוספת של גוון מתקן (0-22 פנינה או 0-99 סגול) בתערובת כדי להשיג בלונד אפור / קור נקי.",
     warningTitle: "שים לב – אזהרה מקצועית",
     specialShadeTitle: "גוון מיוחד – נדרש שיער מוסבן",
     specialShadeSilver: "סדרת סילבר",
@@ -496,6 +497,7 @@ const T = {
     warningBleach: "شعر مفتح حديثاً – لا تستخدمي لوناً دائماً. استخدمي تونر بأكسجين منخفض (1.9%–3%) فقط.",
     warningLift12: "مطلوب تفتيح 3+ مستويات – عملية High-Lift بأكسجين 12%. مخصصة للشعر الطبيعي والصحي فقط.",
     warningLift9: "مطلوب تفتيح 3+ مستويات على شعر مصبوغ – عملية High-Lift بأكسجين 9% فقط. يُمنع استخدام 12% على الشعر المصبوغ!",
+    warningNeutralization: "تم اكتشاف الحاجة إلى تعادل أصفر / برتقالي – إضافة درجة محيّدة (0-22 لؤلؤي أو 0-99 بنفسجي) إلى المزيج للحصول على أشقر رمادي / بارد نقي.",
     warningTitle: "انتبهي – تحذير مهني",
     specialShadeTitle: "درجة خاصة – يتطلب شعراً مفتحاً",
     specialShadeSilver: "سلسلة سيلفر",
@@ -574,6 +576,49 @@ const SPECIAL_LEVEL_12_CODES = new Set([
   ...SILVER_CODES, ...FASHION_CODES, ...BOOSTER_CODES,
 ]);
 
+// ─── Shade temperature classification (for neutralization logic) ─────────────
+// Igora color wheel: last digit indicates temperature
+// 0: Natural (warm base), 1: Ash (cool), 2: Pearl/Iridescent, 3: Gold, 4: Beige/Neutral
+// 5: Gold, 6: Chocolate, 7: Mahogany (red), 8: Red, 9: (various)
+const WARM_UNDERTONE_SUFFIXES = ["0", "3", "5", "6", "7", "8", "50", "60", "70", "80", "710"];
+const COOL_UNDERTONE_SUFFIXES = ["1", "11", "2", "19", "21", "22", "4", "12", "14", "46"];
+
+function getShadeTemperature(code: string): "warm" | "cool" | "neutral" | null {
+  if (!code) return null;
+  // Extract the numeric suffix after the dash (e.g., "7-50" → "50", "8-1" → "1")
+  const parts = code.split("-");
+  if (parts.length < 2) return null;
+  const suffix = parts[1];
+
+  if (WARM_UNDERTONE_SUFFIXES.includes(suffix)) return "warm";
+  if (COOL_UNDERTONE_SUFFIXES.includes(suffix)) return "cool";
+  return "neutral";
+}
+
+type NeutralizationMix = { neutralizerCode: string | null; ratio: number; reason: string };
+
+function detectNeutralization(currCode: string | null, destCode: string | null): NeutralizationMix {
+  if (!currCode || !destCode) return { neutralizerCode: null, ratio: 0, reason: "" };
+
+  const currTemp = getShadeTemperature(currCode);
+  const destTemp = getShadeTemperature(destCode);
+
+  // Rule: if current is WARM (yellow/orange) and dest is COOL (ash/grey), add purple/ash neutralizer
+  if (currTemp === "warm" && destTemp === "cool") {
+    // Yellow (warm) is neutralized by violet/purple (0-99 or 0-22 pearl)
+    // Determine if more yellow or more orange
+    const currSuffix = currCode.split("-")[1];
+    const isVeryWarm = ["50", "60", "80", "710"].includes(currSuffix); // gold, chocolate, red, mahogany
+    return {
+      neutralizerCode: isVeryWarm ? "0-22" : "0-99", // Pearl for orange/warm, Purple for yellow
+      ratio: 0.25, // 25% neutralizer in the final mix
+      reason: `Neutralize warm undertone (${currCode}) to achieve cool ash (${destCode})`,
+    };
+  }
+
+  return { neutralizerCode: null, ratio: 0, reason: "" };
+}
+
 // ─── Formula engine ───────────────────────────────────────────────────────────
 function getLevel(code: string): number | null {
   if (SPECIAL_LEVEL_12_CODES.has(code)) return 12;
@@ -616,20 +661,45 @@ interface MixResult {
   colorCompositionAr: string;
 }
 
-function calcMixture(grayPct: string, destLevel: number | null, isLiftProcess: boolean): MixResult {
+function calcMixture(
+  grayPct: string,
+  destLevel: number | null,
+  isLiftProcess: boolean,
+  currCode: string | null = null,
+  destCode: string | null = null,
+): MixResult & { neutralizerCode?: string; neutralizerRatio?: number } {
   const isHighLift = isLiftProcess;
   const lvl  = Math.round(destLevel ?? 7);
   const base = `${lvl}-0`;
 
+  // Detect if neutralization is needed
+  const neutralization = detectNeutralization(currCode, destCode);
+  const hasNeutralization = neutralization.neutralizerCode !== null && neutralization.ratio > 0;
+
   if (isHighLift) {
     // 1:2 ratio – 40g color + 80g developer = 120g total
+    // If neutralization needed: reduce primary color by neutralizer ratio, add neutralizer
+    const primaryGrams = hasNeutralization
+      ? Math.round(40 * (1 - neutralization.ratio)) // e.g., 40 * 0.75 = 30g
+      : 40;
+    const neutralizerGrams = hasNeutralization ? Math.round(40 * neutralization.ratio) : 0;
+
     return {
-      primaryGrams: 40, baseGrams: null, baseCode: null,
-      developerGrams: 80, isHighLift: true,
-      ratioHe: "1:2 – חמצן כפול!",
-      ratioAr: "1:2 – أكسجين مضاعف!",
-      colorCompositionHe: "100% גוון יעד",
-      colorCompositionAr: "100% لون الهدف",
+      primaryGrams,
+      baseGrams: hasNeutralization ? neutralizerGrams : null,
+      baseCode: hasNeutralization ? neutralization.neutralizerCode : null,
+      developerGrams: 80,
+      isHighLift: true,
+      ratioHe: hasNeutralization ? "1:2 + ניטרול" : "1:2 – חמצן כפול!",
+      ratioAr: hasNeutralization ? "1:2 + تعادل" : "1:2 – أكسجين مضاعف!",
+      colorCompositionHe: hasNeutralization
+        ? `${primaryGrams}g גוון יעד + ${neutralizerGrams}g ${neutralization.neutralizerCode}`
+        : "100% גוון יעד",
+      colorCompositionAr: hasNeutralization
+        ? `${primaryGrams}g لون الهدف + ${neutralizerGrams}g ${neutralization.neutralizerCode}`
+        : "100% لون الهدف",
+      neutralizerCode: hasNeutralization ? neutralization.neutralizerCode : undefined,
+      neutralizerRatio: hasNeutralization ? neutralization.ratio : undefined,
     };
   }
 
@@ -959,12 +1029,13 @@ function FormulaInner() {
 
   // Lift process = 3+ levels AND not recently bleached (bleach = toner only, handled separately)
   const isLiftProcess = bleaching !== "recent" && liftCount !== null && liftCount >= 3;
-  const mix           = calcMixture(grayPct, desiredLevel, isLiftProcess);
+  const mix           = calcMixture(grayPct, desiredLevel, isLiftProcess, currentCode, desiredCode);
   const time          = calcTime(condition, bleaching, mix.isHighLift);
 
   const showBleachWarn  = bleaching === "recent";
   const showDamagedWarn = condition === "damaged";
   const showLiftWarn    = !showBleachWarn && liftCount !== null && liftCount >= 3;
+  const showNeutralizationWarn = mix.neutralizerCode !== null && mix.neutralizerCode !== undefined;
 
   // Special shade detection
   const isSpecialTargetShade = desiredCode ? SPECIAL_LEVEL_12_CODES.has(desiredCode) : false;
@@ -1258,7 +1329,7 @@ function FormulaInner() {
         </div>
 
         {/* ── Warnings ─────────────────────────────────────────────────── */}
-        {(showBleachWarn || showDamagedWarn || showLiftWarn) && (
+        {(showBleachWarn || showDamagedWarn || showLiftWarn || showNeutralizationWarn) && (
           <div className={cn(
             "mb-5 rounded-2xl border p-4",
             showBleachWarn ? "border-red-400/40 bg-red-500/12" : "border-amber-400/40 bg-amber-500/10",
@@ -1275,7 +1346,13 @@ function FormulaInner() {
                   {t.warningTitle}
                 </p>
                 <p className={cn("mt-0.5 text-xs leading-relaxed", showBleachWarn ? "text-red-200/75" : "text-amber-200/75")}>
-                  {showBleachWarn ? t.warningBleach : showLiftWarn ? (devPct === 12 ? t.warningLift12 : t.warningLift9) : t.warningDamaged}
+                  {showBleachWarn
+                    ? t.warningBleach
+                    : showLiftWarn
+                    ? (devPct === 12 ? t.warningLift12 : t.warningLift9)
+                    : showNeutralizationWarn
+                    ? (t.warningNeutralization ?? "ניטרול צבע דרוש")
+                    : t.warningDamaged}
                 </p>
               </div>
             </div>

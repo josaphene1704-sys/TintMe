@@ -21,6 +21,19 @@ export const save = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
+
+    // בדיקת מגבלת משתמש חינמי — מקסימום אבחון אחד
+    const user = await ctx.db.get(userId);
+    if (user && user.userType === "free") {
+      const existingCount = await ctx.db
+        .query("formulas")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .count();
+      if (existingCount >= 1) {
+        throw new Error("משתמש חינמי יכול לשמור אבחון אחד בלבד. אנא קנה חבילה כדי לשמור אבחונים נוספים.");
+      }
+    }
+
     return await ctx.db.insert("formulas", {
       userId,
       ...args,

@@ -21,8 +21,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "TentMe",
-  description: "TentMe",
+  title: "TintMe",
+  description: "TintMe - אבחון שיער והתאמת פורמולה",
 };
 
 // רכיב ה-Layout הראשי של האפליקציה

@@ -897,8 +897,8 @@ function FormulaInner() {
     if (saved === "he" || saved === "ar") setLang(saved);
     setCurrentCode(localStorage.getItem("tintme_current_shade"));
     setDesiredCode(localStorage.getItem("tintme_desired_shade"));
-    setCurrentPhoto(sessionStorage.getItem("tintme_current_photo"));
-    setDesiredPhoto(sessionStorage.getItem("tintme_desired_photo"));
+    setCurrentPhoto(localStorage.getItem("tintme_current_photo"));
+    setDesiredPhoto(localStorage.getItem("tintme_desired_photo"));
     setDataLoaded(true);
   }, []);
 

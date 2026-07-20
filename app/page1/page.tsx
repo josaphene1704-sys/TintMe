@@ -448,6 +448,11 @@ export default function PhotoAndColorPage() {
   const [photo, setPhoto]               = useState<{ file: File; preview: string } | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
+  useEffect(() => {
+    const saved = localStorage.getItem("tintme_lang") as Lang | null;
+    if (saved === "he" || saved === "ar") setLang(saved);
+  }, []);
+
   const t     = T[lang];
   const canGo = !!selectedCode;
 
@@ -518,7 +523,7 @@ export default function PhotoAndColorPage() {
             type="button"
             onClick={() => {
               if (selectedCode) localStorage.setItem("tintme_current_shade", selectedCode);
-              if (photo?.preview) sessionStorage.setItem("tintme_current_photo", photo.preview);
+              if (photo?.preview) localStorage.setItem("tintme_current_photo", photo.preview);
               router.push("/page1b");
             }}
             disabled={!canGo}

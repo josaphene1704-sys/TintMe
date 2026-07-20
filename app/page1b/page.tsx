@@ -251,6 +251,11 @@ export default function DesiredHairPage() {
   const [isDragging, setIsDragging]   = useState(false);
   const fileInputRef                  = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const saved = localStorage.getItem("tintme_lang") as Lang | null;
+    if (saved === "he" || saved === "ar") setLang(saved);
+  }, []);
+
   const t          = T[lang];
   const currentCat = CATEGORIES.find((c) => c.id === activeTab) ?? CATEGORIES[0];
   const canGo      = !!selectedCode;
@@ -605,7 +610,7 @@ export default function DesiredHairPage() {
             disabled={!canGo}
             onClick={() => {
               if (selectedCode) localStorage.setItem("tintme_desired_shade", selectedCode);
-              if (photo?.preview) sessionStorage.setItem("tintme_desired_photo", photo.preview);
+              if (photo?.preview) localStorage.setItem("tintme_desired_photo", photo.preview);
               router.push("/page2");
             }}
             className={cn(

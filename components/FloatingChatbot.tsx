@@ -65,7 +65,7 @@ export default function FloatingChatbot({ hairContext }: Props) {
       const data = await res.json();
       const assistantMsg: Message = {
         role: "assistant",
-        content: data.text ?? (data.detail ? `שגיאה: ${data.detail}` : "מצטערת, נתקלתי בבעיה. אנא נסי שוב."),
+        content: data.text ?? "מצטערת, נתקלתי בבעיה. אנא נסי שוב.",
       };
 
       setDisplayMessages((prev) => [...prev, assistantMsg]);

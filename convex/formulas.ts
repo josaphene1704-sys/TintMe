@@ -25,11 +25,11 @@ export const save = mutation({
     // בדיקת מגבלת משתמש חינמי — מקסימום אבחון אחד
     const user = await ctx.db.get(userId);
     if (user && user.userType === "free") {
-      const existingCount = await ctx.db
+      const existing = await ctx.db
         .query("formulas")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .count();
-      if (existingCount >= 1) {
+        .first();
+      if (existing) {
         throw new Error("משתמש חינמי יכול לשמור אבחון אחד בלבד. אנא קנה חבילה כדי לשמור אבחונים נוספים.");
       }
     }

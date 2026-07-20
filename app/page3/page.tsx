@@ -698,7 +698,7 @@ function calcMixture(
       colorCompositionAr: hasNeutralization
         ? `${primaryGrams}g لون الهدف + ${neutralizerGrams}g ${neutralization.neutralizerCode}`
         : "100% لون الهدف",
-      neutralizerCode: hasNeutralization ? neutralization.neutralizerCode : undefined,
+      neutralizerCode: neutralization.neutralizerCode ?? undefined,
       neutralizerRatio: hasNeutralization ? neutralization.ratio : undefined,
     };
   }
@@ -723,7 +723,27 @@ function calcMixture(
         colorCompositionHe: "1:1 גוון יעד + בסיס טבעי",
         colorCompositionAr: "1:1 لون الهدف + قاعدة طبيعية",
       };
-    default:
+    default: {
+      // No gray coverage → the base slot is free, so apply neutralization here.
+      // Warm current + cool target (e.g. orange/yellow hair → ash blonde) adds a
+      // pearl/violet neutralizer that cancels the unwanted warm undertone.
+      if (hasNeutralization) {
+        const primaryGrams = Math.round(60 * (1 - neutralization.ratio)); // 60 → 45g
+        const neutralizerGrams = Math.round(60 * neutralization.ratio);   // → 15g
+        return {
+          primaryGrams,
+          baseGrams: neutralizerGrams,
+          baseCode: neutralization.neutralizerCode,
+          developerGrams: 60,
+          isHighLift: false,
+          ratioHe: "1:1 + ניטרול גוון",
+          ratioAr: "1:1 + تعادل النبرة",
+          colorCompositionHe: `${primaryGrams}g גוון יעד + ${neutralizerGrams}g ${neutralization.neutralizerCode}`,
+          colorCompositionAr: `${primaryGrams}g لون الهدف + ${neutralizerGrams}g ${neutralization.neutralizerCode}`,
+          neutralizerCode: neutralization.neutralizerCode ?? undefined,
+          neutralizerRatio: neutralization.ratio,
+        };
+      }
       return {
         primaryGrams: 60, baseGrams: null, baseCode: null,
         developerGrams: 60, isHighLift: false,
@@ -732,6 +752,7 @@ function calcMixture(
         colorCompositionHe: "100% גוון יעד",
         colorCompositionAr: "100% لون الهدف",
       };
+    }
   }
 }
 

@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "if [ -z \"$TENT_ME_CONVEX_DEPLOY_KEY\" ]; then echo 'Missing TENT_ME_CONVEX_DEPLOY_KEY env var in Vercel project settings'; exit 1; fi; CONVEX_DEPLOY_KEY=\"$TENT_ME_CONVEX_DEPLOY_KEY\" npx convex deploy --cmd 'npm run build'"
+}

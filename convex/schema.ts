@@ -38,8 +38,28 @@ export default defineSchema({
     isActive: v.boolean(), // האם המשתמש פעיל
     createdAt: v.number(), // זמן יצירה (Timestamp)
     updatedAt: v.number(), // זמן עדכון אחרון (Timestamp)
+
+    // ── קרדיטים של חבילות בתשלום ──────────────────────────────────────────
+    // אופציונליים בכוונה: משתמשים שנוצרו לפני הפיצ'ר לא מכילים את השדות,
+    // ושדה חובה היה מפיל את ה-schema push על המסמכים הקיימים.
+    // קוראים דרך getUserCredits() ב-convex/credits.ts שמנרמל undefined ל-0.
+    totalCredits: v.optional(v.number()), // סך הקרדיטים שנרכשו אי פעם (מצטבר)
+    usedCredits: v.optional(v.number()), // כמה נוצלו בפועל
+    remainingCredits: v.optional(v.number()), // כמה נשארו למימוש
   })
     .index("by_email", ["email"]) // אינדקס לחיפוש מהיר לפי אימייל
     .index("by_role", ["role"]) // אינדקס לסינון מהיר לפי תפקיד
     .index("by_userType", ["userType"]), // אינדקס לסינון מהיר לפי סוג משתמש
+
+  // רישום הזמנות שכבר טופלו מ-Polar
+  // מטרה: אידמפוטנטיות. Polar שולח order.created ו-order.paid על אותה עסקה,
+  // ומבצע retry על כשלים — בלי הטבלה הזו לקוחה הייתה מקבלת קרדיטים כפולים.
+  polarOrders: defineTable({
+    orderId: v.string(), // מזהה ההזמנה ב-Polar (מפתח הדדופליקציה)
+    userId: v.id("users"),
+    productId: v.string(),
+    creditsGranted: v.number(),
+    eventType: v.string(), // האירוע שגרם לזיכוי בפועל
+    processedAt: v.number(),
+  }).index("by_orderId", ["orderId"]),
 });

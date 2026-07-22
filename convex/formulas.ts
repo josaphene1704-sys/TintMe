@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { consumeOneCredit } from "./credits";
 import { mutation, query } from "./_generated/server";
 
 export const save = mutation({
@@ -22,15 +23,24 @@ export const save = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
-    // בדיקת מגבלת משתמש חינמי — מקסימום אבחון אחד
+    // ── בקרת גישה: קרדיטים תחילה, ואז המכסה החינמית ──────────────────────
+    // הניכוי מתבצע כאן ולא בצד הלקוח, כדי שלא יהיה ניתן לעקוף אותו מהדפדפן.
+    // ההערכה חייבת להתבצע לפני ה-insert כדי שאבחון שנחסם לא ייכתב.
     const user = await ctx.db.get(userId);
-    if (user && user.userType === "free") {
-      const existing = await ctx.db
-        .query("formulas")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first();
-      if (existing) {
-        throw new Error("משתמש חינמי יכול לשמור אבחון אחד בלבד. אנא קנה חבילה כדי לשמור אבחונים נוספים.");
+    if (user) {
+      const consumed = await consumeOneCredit(ctx, userId);
+
+      if (!consumed) {
+        // אין יתרת קרדיטים — נופלים למכסה החינמית של אבחון אחד
+        const existing = await ctx.db
+          .query("formulas")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .first();
+        if (existing) {
+          throw new Error(
+            "נגמרו האבחונים בחבילה שלך. אנא רכשי חבילה חדשה כדי להמשיך."
+          );
+        }
       }
     }
 

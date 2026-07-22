@@ -32,20 +32,25 @@ export default function PremiumGate({ children, forcePreview }: PremiumGateProps
   const updateUserType = useMutation(api.users.updateUserType);
   const resetAllToFree = useMutation(api.users.resetAllUsersToFreePublic);
 
-  // שליפת מנוי נוכחי מ-Convex Polar Component
-  const subscription = useQuery(
-    api.polar.getSubscriptionStatus,
-    user ? { userId: user._id } : "skip"
-  );
+  // יתרת הקרדיטים של החבילה שנרכשה
+  const credits = useQuery(api.credits.getMyCredits);
+  // מספר האבחונים שכבר בוצעו — קובע אם המכסה החינמית עדיין זמינה
+  const formulaCount = useQuery(api.formulas.getCount);
 
   const [paywallOpen, setPaywallOpen] = useState(false);
 
-  // בדיקת סטטוס מנוי - משתמש פרימיום אם userType = paid (mock) או יש מנוי פעיל
+  // הערה: לא בודקים כאן getSubscriptionStatus. המוצרים ב-Polar חד-פעמיים
+  // (recurring=false), ולכן טבלת המנויים של הרכיב לעולם לא מתמלאת והבדיקה
+  // הזו תמיד הייתה מחזירה false. מקור האמת הוא remainingCredits.
   const isPaid = useMemo(() => {
-    const isMockPaid = user?.userType === "paid";
-    const isRealPaid = subscription?.status === "active";
-    return isMockPaid || isRealPaid;
-  }, [user?.userType, subscription?.status]);
+    // מצב בדיקה בלבד — userType לבדו כבר לא מקנה גישה, כי הוא נשאר "paid"
+    // גם אחרי שהקרדיטים נגמרו
+    const isMockPaid = MOCK_PAYMENTS && user?.userType === "paid";
+    const hasCredits = (credits?.remainingCredits ?? 0) > 0;
+    // המכסה החינמית: אבחון ראשון אחד לכל משתמשת
+    const hasFreeDiagnosis = formulaCount === 0;
+    return isMockPaid || hasCredits || hasFreeDiagnosis;
+  }, [user?.userType, credits?.remainingCredits, formulaCount]);
 
   // פתיחה אוטומטית של Paywall כשהעמוד "נעול"
   useEffect(() => {
@@ -105,8 +110,10 @@ export default function PremiumGate({ children, forcePreview }: PremiumGateProps
     </button>
   ) : null;
 
-  // אם המשתמש עדיין נטען, נמתין (לא נציג תוכן כדי למנוע "פלאש" של תוכן חינמי)
-  if (user === undefined) {
+  // אם המשתמש או נתוני הגישה עדיין נטענים, נמתין.
+  // בלי ההמתנה על credits/formulaCount, משתמשת משלמת הייתה רואה הבזק של
+  // ה-Paywall (וה-useEffect היה פותח אותו) לפני שהיתרה מגיעה מהשרת.
+  if (user === undefined || credits === undefined || formulaCount === undefined) {
     return <div className="min-h-[60vh]" />; // מצב טעינה
   }
 

@@ -17,6 +17,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import CreditsWidget from "@/components/credits/CreditsWidget";
 import { PLAN_DISPLAY } from "@/config/planDisplay";
 import { api } from "@/convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -138,6 +139,7 @@ export default function Home() {
   const formulaCount = useQuery(api.formulas.getCount);
   const latestFormula = useQuery(api.formulas.getLatest);
   const currentUser = useQuery(api.users.getCurrentUser);
+  const credits = useQuery(api.credits.getMyCredits);
   const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
 
   const [showPaywallAlert, setShowPaywallAlert] = useState(false);
@@ -156,8 +158,11 @@ export default function Home() {
   }, [showPaywallAlert]);
 
   const isCountLoading = isAuthenticated && formulaCount === undefined;
-  const isPaid = currentUser?.userType === "paid";
-  const isBlocked = isAuthenticated && !isPaid && typeof formulaCount === "number" && formulaCount >= 1;
+  // הגישה נקבעת לפי יתרת הקרדיטים בפועל, ולא לפי userType.
+  // userType נשאר "paid" גם אחרי שהחבילה נוצלה, ולכן הוא לא מדד גישה תקף.
+  const hasCredits = (credits?.remainingCredits ?? 0) > 0;
+  const isBlocked =
+    isAuthenticated && !hasCredits && typeof formulaCount === "number" && formulaCount >= 1;
 
   function handleLangSwitch() {
     setLang((l) => (l === "he" ? "ar" : "he"));
@@ -230,7 +235,9 @@ export default function Home() {
       const { url } = await generateCheckoutLink({
         productIds: [productId],
         origin: window.location.origin,
-        successUrl: `${window.location.origin}/success`,
+        // Polar מחליף את {CHECKOUT_ID} במזהה העסקה בזמן ההפניה,
+        // וזה מה ש-app/success/page.tsx קורא מה-searchParams
+        successUrl: `${window.location.origin}/success?checkout_id={CHECKOUT_ID}`,
       });
       window.location.href = url;
     } catch {
@@ -377,6 +384,9 @@ export default function Home() {
             </span>
           </button>
         </div>
+
+        {/* Credits usage — visible once a package has been purchased */}
+        {isAuthenticated && <CreditsWidget lang={lang} />}
 
         {/* Last Formula shortcut — visible when user has at least one saved formula */}
         {isAuthenticated && latestFormula && (

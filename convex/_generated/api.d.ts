@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as credits from "../credits.js";
 import type * as formulas from "../formulas.js";
 import type * as http from "../http.js";
 import type * as polar from "../polar.js";
@@ -22,6 +23,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  credits: typeof credits;
   formulas: typeof formulas;
   http: typeof http;
   polar: typeof polar;

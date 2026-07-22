@@ -31,7 +31,9 @@ polar.registerRoutes(http as any, {
 // ל-order.*. ה-switch שלו גם חסר default, כך שאירוע הזמנה מוחזר כ-202 בשקט
 // ואף אחד לא מזוכה. החבילות שלנו הן חד-פעמיות, ולכן זה הנתיב היחיד שמזכה קרדיטים.
 //
-// ⚠️ דורש endpoint שני ב-Polar Dashboard שמצביע לכאן, עם אותו POLAR_WEBHOOK_SECRET.
+// ⚠️ דורש endpoint שני ב-Polar Dashboard שמצביע לכאן. ל-Polar יש סוד ייחודי
+// לכל endpoint, ולכן הנתיב הזה קורא את POLAR_ORDERS_WEBHOOK_SECRET (ולא את
+// POLAR_WEBHOOK_SECRET, ששייך ל-/polar/events).
 
 type PolarOrderData = {
   id?: string;
@@ -72,9 +74,14 @@ http.route({
   path: "/polar/orders",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const secret = process.env.POLAR_WEBHOOK_SECRET;
+    // סוד נפרד משלו: Polar מייצר סוד ייחודי לכל endpoint ולא מאפשר להזין
+    // אותו ידנית, ולכן ל-/polar/orders יש סוד משלו.
+    // ⚠️ POLAR_WEBHOOK_SECRET שייך ל-/polar/events של הרכיב — לא לדרוס אותו.
+    // ה-fallback קיים רק לתאימות לאחור עבור סביבה שטרם הוגדרה.
+    const secret =
+      process.env.POLAR_ORDERS_WEBHOOK_SECRET ?? process.env.POLAR_WEBHOOK_SECRET;
     if (!secret) {
-      console.error("[polar/orders] POLAR_WEBHOOK_SECRET לא מוגדר");
+      console.error("[polar/orders] POLAR_ORDERS_WEBHOOK_SECRET לא מוגדר");
       return new Response("Server misconfigured", { status: 500 });
     }
 

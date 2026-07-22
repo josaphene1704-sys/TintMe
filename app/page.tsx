@@ -27,7 +27,7 @@ const translations = {
   he: {
     switchLabel: "العربية",
     tagline: "המומחה האישי שלך לצבע שיער",
-    missCosBanner: "כל מוצרי הצבע שתצטרכי — במקום אחד",
+    missCosBanner: "כל מוצרי השיער שתצטרכי — במקום אחד",
     missCosLink: "קנייה עכשיו ב-Lamis Cosmetics ←",
     lastFormulaBtn: "חזרה לנוסחה האחרונה שלי",
     lastFormulaSub: "צפי בנוסחה וסדרי את המצרכים",
@@ -51,7 +51,7 @@ const translations = {
     upgradeBtn: "שדרגי עכשיו",
     recommendedBadge: "מומלץ",
     monthlyFeatures: [
-      "אבחונים ונוסחאות ללא הגבלה",
+      "🤖 בוט חכם לשאלות עבור תהליך הצביעה",
       "רשימות קניות מיידיות",
       "שיתוף דרך WhatsApp",
       "תמיכה מקצועית",
@@ -60,7 +60,7 @@ const translations = {
   ar: {
     switchLabel: "עברית",
     tagline: "خبيرتك الشخصية في تلوين الشعر",
-    missCosBanner: "كل منتجات التلوين التي تحتاجينها — في مكان واحد",
+    missCosBanner: "كل منتجات الشعر التي تحتاجينها — في مكان واحد",
     missCosLink: "تسوقي الآن في Lamis Cosmetics ←",
     lastFormulaBtn: "العودة إلى تركيبتي الأخيرة",
     lastFormulaSub: "اعرضي التركيبة واطلبي المنتجات",
@@ -84,7 +84,7 @@ const translations = {
     upgradeBtn: "ترقية الآن",
     recommendedBadge: "موصى به",
     monthlyFeatures: [
-      "تشخيصات وتركيبات بلا حدود",
+      "🤖 بوت ذكي للأسئلة حول عملية الصباغة",
       "قوائم تسوق فورية",
       "المشاركة عبر واتساب",
       "دعم احترافي",

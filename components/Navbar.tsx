@@ -73,6 +73,9 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // מיקום השלב הנוכחי ברצף — משמש גם לתצוגה המקוצרת בנייד
+  const activeStepIndex = STEPS.findIndex((step) => step.paths.includes(pathname ?? ""));
+
   const displayName =
     (user?.fullName && user.fullName !== "User" ? user.fullName : null) ??
     user?.email?.split("@")[0] ??
@@ -119,44 +122,57 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 border-border border-b bg-background/95 backdrop-blur-sm">
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto px-3 py-4 md:px-6">
+        <div className="flex items-center justify-between gap-2">
           {/* ניווט - צד ימין (RTL) */}
-          <div className="flex items-center gap-6">
+          <div className="flex min-w-0 items-center gap-2 md:gap-6">
             <Link
               aria-label="דף הבית"
-              className="text-2xl transition-transform hover:scale-110"
+              className="shrink-0 text-2xl transition-transform hover:scale-110"
               href="/"
             >
               <Home className="h-6 w-6 text-foreground" />
             </Link>
 
-            {/* אינדיקטור שלבים */}
-            <div className="flex items-center gap-1" dir="rtl">
-              {STEPS.map((step, i) => {
-                const isActive = step.paths.includes(pathname ?? "");
-                return (
-                  <div key={step.label} className="flex items-center gap-1">
-                    <span
-                      className={`text-sm font-medium px-2 py-0.5 rounded-full transition-colors ${
-                        isActive
-                          ? "text-fuchsia-400 bg-fuchsia-500/15"
-                          : "text-foreground/35"
-                      }`}
-                    >
-                      {step.label}
-                    </span>
-                    {i < STEPS.length - 1 && (
-                      <span className="text-foreground/20 text-xs">·</span>
-                    )}
-                  </div>
-                );
-              })}
+            {/*
+              אינדיקטור שלבים.
+              ארבע התוויות יחד עם כפתור הפרופיל הגיעו ל-~450px ברוחב מסך של
+              390px, מה שגרם לגלישה אופקית בכל עמודי האפליקציה. בנייד מוצג
+              רק השלב הפעיל עם מונה, ומ-md ומעלה חוזרת הרשימה המלאה.
+            */}
+            <div className="flex min-w-0 items-center gap-1" dir="rtl">
+              {/* נייד: שלב פעיל בלבד */}
+              {activeStepIndex >= 0 && (
+                <span className="truncate rounded-full bg-fuchsia-500/15 px-2 py-0.5 font-medium text-fuchsia-400 text-xs md:hidden">
+                  {STEPS[activeStepIndex].label} · {activeStepIndex + 1}/{STEPS.length}
+                </span>
+              )}
+
+              {/* md ומעלה: כל השלבים */}
+              <div className="hidden items-center gap-1 md:flex">
+                {STEPS.map((step, i) => {
+                  const isActive = i === activeStepIndex;
+                  return (
+                    <div key={step.label} className="flex items-center gap-1">
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-medium text-sm transition-colors ${
+                          isActive ? "bg-fuchsia-500/15 text-fuchsia-400" : "text-foreground/35"
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                      {i < STEPS.length - 1 && (
+                        <span className="text-foreground/20 text-xs">·</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           {/* פרופיל משתמש או כפתור התחברות - צד שמאל (RTL) */}
-          <div className="mr-auto flex items-center gap-3">
+          <div className="mr-auto flex shrink-0 items-center gap-3">
             {/* כפתור דיבאג (Dev בלבד) - אייקון באג בצד שמאל למעלה */}
             {IS_DEV_MODE && (
               <div className="relative" ref={debugRef}>

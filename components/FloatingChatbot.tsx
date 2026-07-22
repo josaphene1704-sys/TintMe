@@ -112,10 +112,17 @@ export default function FloatingChatbot({ hairContext }: Props) {
           className="fixed right-4 bottom-[88px] left-4 z-50 sm:right-6 sm:left-auto sm:w-[380px] md:right-6"
           style={{ animation: "chatSlideUp 0.28s cubic-bezier(0.22,1,0.36,1)" }}
         >
+          {/*
+            הגובה חייב להיות מוגבל לגובה המסך בפועל.
+            520px קבוע + bottom-[88px] דורשים 608px, ובנייד עם שורת כתובת
+            גלויה החלק העליון של החלון נדחף מחוץ למסך והתשובות נחתכות.
+            dvh (ולא vh) מתעדכן כשסרגלי הדפדפן נכנסים ויוצאים.
+            בדפדפן ישן שלא מכיר dvh, ה-max-height פשוט מתעלם ונשארת
+            ההתנהגות הקודמת — כלומר אין רגרסיה.
+          */}
           <div
-            className="flex flex-col overflow-hidden rounded-3xl border border-white/15 shadow-2xl"
+            className="flex h-[520px] max-h-[calc(100dvh-104px)] flex-col overflow-hidden rounded-3xl border border-white/15 shadow-2xl sm:max-h-[calc(100dvh-120px)]"
             style={{
-              height: "520px",
               background: "linear-gradient(160deg, rgba(55,7,96,0.97) 0%, rgba(24,5,48,0.98) 100%)",
               boxShadow: "0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.06)",
               backdropFilter: "blur(24px)",
@@ -160,11 +167,15 @@ export default function FloatingChatbot({ hairContext }: Props) {
               </div>
             </div>
 
-            {/* Messages */}
+            {/*
+              Messages
+              min-h-0 מאפשר לאזור ההודעות להתכווץ מתחת לגובה התוכן שלו.
+              בלעדיו, במסכים נמוכים הוא דוחף את שדה הקלט מחוץ לחלון.
+            */}
             <div
               aria-label="שיחה עם TintMe AI"
               aria-live="polite"
-              className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
+              className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
               style={{ scrollbarWidth: "none" }}
             >
               {displayMessages.map((msg, i) => (

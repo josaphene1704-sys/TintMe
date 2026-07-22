@@ -273,8 +273,17 @@ export default function Home() {
         <div className="flex items-center justify-between gap-2">
           {/* Auth: login button or user name + logout */}
           {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white/90 backdrop-blur-md">
+            // min-w-0 על המכל + truncate על השם: בלעדיהם שם ארוך (או אימייל
+            // ארוך לפני ה-@) מרחיב את ה-flex ודוחף את הכפתורים מחוץ למסך בנייד
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="max-w-[42vw] truncate rounded-full border border-white/20 bg-white/10 px-3 py-1.5 font-medium text-sm text-white/90 backdrop-blur-md sm:max-w-[220px]"
+                title={
+                  (currentUser?.fullName && currentUser.fullName !== "User"
+                    ? currentUser.fullName
+                    : currentUser?.email?.split("@")[0]) ?? ""
+                }
+              >
                 {(currentUser?.fullName && currentUser.fullName !== "User"
                   ? currentUser.fullName
                   : currentUser?.email?.split("@")[0]) ?? ""}
@@ -282,7 +291,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => signOut()}
-                className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/70 backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95"
+                className="shrink-0 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 font-medium text-white/70 text-xs backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95"
               >
                 {lang === "he" ? "יציאה" : "خروج"}
               </button>
@@ -300,7 +309,7 @@ export default function Home() {
           <button
             type="button"
             onClick={handleLangSwitch}
-            className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95"
+            className="shrink-0 rounded-full border border-white/20 bg-white/10 px-4 py-2 font-medium text-sm text-white/90 backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95"
           >
             {t.switchLabel}
           </button>

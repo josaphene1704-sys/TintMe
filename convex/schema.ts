@@ -46,6 +46,14 @@ export default defineSchema({
     totalCredits: v.optional(v.number()), // סך הקרדיטים שנרכשו אי פעם (מצטבר)
     usedCredits: v.optional(v.number()), // כמה נוצלו בפועל
     remainingCredits: v.optional(v.number()), // כמה נשארו למימוש
+
+    // ── מכסת שאלות לבוט ───────────────────────────────────────────────────
+    // מאגר מצטבר: כל משתמשת מתחילה עם FREE_BOT_QUESTIONS שאלות חינם,
+    // וכל קרדיט אבחון שנרכש מוסיף BOT_QUESTIONS_PER_CREDIT שאלות.
+    // אופציונליים מאותה סיבה כמו הקרדיטים — ראה getBotQuota() ב-convex/credits.ts.
+    botQuestionsTotal: v.optional(v.number()), // סך השאלות שהוקצו אי פעם
+    botQuestionsUsed: v.optional(v.number()), // כמה שאלות נשאלו
+    botQuestionsRemaining: v.optional(v.number()), // כמה נשארו
   })
     .index("by_email", ["email"]) // אינדקס לחיפוש מהיר לפי אימייל
     .index("by_role", ["role"]) // אינדקס לסינון מהיר לפי תפקיד

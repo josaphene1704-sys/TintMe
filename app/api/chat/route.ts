@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextRequest, NextResponse } from "next/server";
+import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
+import { ConvexHttpClient } from "convex/browser";
+import { type NextRequest, NextResponse } from "next/server";
+import { api } from "@/convex/_generated/api";
 
 const SYSTEM_PROMPT = `אתה עוזר מקצועי ברמת סלון עולמי לצביעת שיער עבור אפליקציית 'TintMe'.
 עליך לענות אך ורק בעברית (RTL), בצורה תמציתית, מדויקת ואמפתית.
@@ -51,13 +54,44 @@ const SYSTEM_PROMPT = `אתה עוזר מקצועי ברמת סלון עולמי
 כאשר המשתמשת שואלת על נוסחה, חשבי לפי הכללים הנ"ל ותני תשובה מספרית מדויקת.
 השתמשי בנתוני השיער שסופקו (אם קיימים) כהקשר אישי לתשובות.`;
 
-
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
 
 export async function POST(req: NextRequest) {
+  // ── אימות ומכסה ─────────────────────────────────────────────────────────
+  // הנתיב הזה היה פתוח לחלוטין: כל אחד יכול היה להפציץ אותו ולשרוף את
+  // תקציב ה-API. הניכוי חייב לקרות בשרת ולפני הקריאה ל-Anthropic, אחרת
+  // אפשר לעקוף כל מונה ע"י קריאה ישירה ל-endpoint.
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!convexUrl) {
+    return NextResponse.json({ error: "Convex URL not configured" }, { status: 500 });
+  }
+
+  const token = await convexAuthNextjsToken();
+  if (!token) {
+    return NextResponse.json(
+      { error: "unauthenticated", text: "יש להתחבר כדי לשוחח עם הבוט." },
+      { status: 401 }
+    );
+  }
+
+  const convex = new ConvexHttpClient(convexUrl);
+  convex.setAuth(token);
+
+  const quota = await convex.mutation(api.credits.consumeBotQuestion, {});
+  if (!quota.ok) {
+    const text =
+      quota.reason === "exhausted"
+        ? "נגמרו לך השאלות לבוט. רכשי חבילת אבחונים כדי לקבל שאלות נוספות."
+        : "יש להתחבר כדי לשוחח עם הבוט.";
+    return NextResponse.json(
+      { error: quota.reason, text, remaining: quota.remaining, total: quota.total },
+      { status: quota.reason === "exhausted" ? 402 : 401 }
+    );
+  }
+
   try {
     const { messages, hairContext } = (await req.json()) as {
       messages: ChatMessage[];
@@ -66,6 +100,7 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
+      await convex.mutation(api.credits.refundBotQuestion, {});
       return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     }
 
@@ -87,10 +122,12 @@ export async function POST(req: NextRequest) {
         ? response.content[0].text
         : "מצטערת, לא הצלחתי לעבד את הבקשה. אנא נסי שוב.";
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ text, remaining: quota.remaining, total: quota.total });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Claude API error:", message);
+    // התקלה אצלנו — לא הוגן לגבות על כך שאלה
+    await convex.mutation(api.credits.refundBotQuestion, {});
     return NextResponse.json({ error: "Internal server error", detail: message }, { status: 500 });
   }
 }

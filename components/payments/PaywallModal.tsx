@@ -29,7 +29,10 @@ type PaywallModalProps = {
   hasUsedFree?: boolean;
 };
 
-const FEATURES_FREE: string[] = ["אבחון בסיסי אחד (להתחלה)"];
+const FEATURES_FREE: string[] = [
+  "אבחון בסיסי אחד (להתחלה)",
+  "🤖 בוט חכם לשאלות עבור תהליך הצביעה",
+];
 
 const FEATURES_PACK_1: string[] = [
   "אבחון צבע מקצועי ומלא",

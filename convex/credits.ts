@@ -8,7 +8,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation, type MutationCtx, query } from "./_generated/server";
+import { internalMutation, type MutationCtx, mutation, query } from "./_generated/server";
 
 // ── מיפוי מוצר -> כמות קרדיטים ───────────────────────────────────────────────
 // אותם משתני סביבה שמשמשים את convex/polar.ts, כדי שלא ייווצר מקור אמת שני.
@@ -21,6 +21,21 @@ export function creditsForProduct(productId: string): number {
   if (pack3) map[pack3] = 3;
   if (pack30) map[pack30] = 30;
   return map[productId] ?? 0;
+}
+
+// ── מכסת שאלות לבוט ─────────────────────────────────────────────────────────
+// כל משתמשת מקבלת 3 שאלות חינם לכל החיים (טעימה מהשירות),
+// וכל אבחון שנרכש מוסיף 5 שאלות למאגר.
+export const FREE_BOT_QUESTIONS = 3;
+export const BOT_QUESTIONS_PER_CREDIT = 5;
+
+// קריאה מנורמלת: משתמשת שמעולם לא נגעה בבוט אין לה את השדות,
+// ואז המכסה ההתחלתית היא המכסה החינמית.
+export function getBotQuota(user: Doc<"users">) {
+  const total = user.botQuestionsTotal ?? FREE_BOT_QUESTIONS;
+  const used = user.botQuestionsUsed ?? 0;
+  const remaining = user.botQuestionsRemaining ?? Math.max(0, total - used);
+  return { total, used, remaining };
 }
 
 // ── קריאה מנורמלת של המונים ─────────────────────────────────────────────────
@@ -71,12 +86,18 @@ export const grantCreditsForOrder = internalMutation({
       return { status: "user_not_found" as const, orderId: args.orderId };
     }
 
-    // 4. עדכון המונים
+    // 4. עדכון המונים — קרדיטים, ובמקביל מכסת השאלות לבוט
     const current = getUserCredits(user);
+    const bot = getBotQuota(user);
+    const addedQuestions = credits * BOT_QUESTIONS_PER_CREDIT;
     await ctx.db.patch(user._id, {
       totalCredits: current.totalCredits + credits,
       remainingCredits: current.remainingCredits + credits,
       usedCredits: current.usedCredits, // מנרמל undefined לאפס עבור משתמשים ותיקים
+      // המכסה החינמית שטרם נוצלה נשמרת ומצטברת מעל הרכישה
+      botQuestionsTotal: bot.total + addedQuestions,
+      botQuestionsRemaining: bot.remaining + addedQuestions,
+      botQuestionsUsed: bot.used,
       userType: "paid",
       updatedAt: Date.now(),
     });
@@ -157,6 +178,87 @@ export async function consumeOneCredit(ctx: MutationCtx, userId: Id<"users">): P
   });
   return true;
 }
+
+// ── ניצול שאלת בוט ──────────────────────────────────────────────────────────
+// נקרא מ-app/api/chat/route.ts לפני הפנייה ל-Anthropic.
+// חייב לרוץ בשרת: ה-route היה פתוח לחלוטין, וכל מונה בצד הלקוח ניתן לעקיפה
+// ע"י קריאה ישירה ל-endpoint.
+export const consumeBotQuestion = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return { ok: false as const, reason: "unauthenticated" as const, remaining: 0, total: 0 };
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return { ok: false as const, reason: "unauthenticated" as const, remaining: 0, total: 0 };
+    }
+
+    const quota = getBotQuota(user);
+    if (quota.remaining <= 0) {
+      return {
+        ok: false as const,
+        reason: "exhausted" as const,
+        remaining: 0,
+        total: quota.total,
+      };
+    }
+
+    await ctx.db.patch(userId, {
+      botQuestionsTotal: quota.total,
+      botQuestionsUsed: quota.used + 1,
+      botQuestionsRemaining: quota.remaining - 1,
+      updatedAt: Date.now(),
+    });
+
+    return {
+      ok: true as const,
+      reason: "granted" as const,
+      remaining: quota.remaining - 1,
+      total: quota.total,
+    };
+  },
+});
+
+// החזרת שאלה שנוכתה כאשר הקריאה ל-Anthropic נכשלה.
+// בלי זה, תקלה אצלנו הייתה גובה מהמשתמשת שאלה בלי שקיבלה תשובה.
+export const refundBotQuestion = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const quota = getBotQuota(user);
+    if (quota.used <= 0) return null; // אין מה להחזיר
+
+    await ctx.db.patch(userId, {
+      botQuestionsTotal: quota.total,
+      botQuestionsUsed: quota.used - 1,
+      botQuestionsRemaining: Math.min(quota.total, quota.remaining + 1),
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+// ── שליפת מכסת הבוט עבור ה-UI ───────────────────────────────────────────────
+export const getMyBotQuota = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    return getBotQuota(user);
+  },
+});
 
 // ── שליפת מצב הקרדיטים עבור ה-UI ────────────────────────────────────────────
 export const getMyCredits = query({

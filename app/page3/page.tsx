@@ -32,6 +32,7 @@ import {
   Zap,
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
+import { THREE_SHADES_BY_CODE } from "@/lib/colorCatalogs/three";
 import { cn } from "@/lib/utils";
 
 // ─── Shade catalog ────────────────────────────────────────────────────────────
@@ -110,6 +111,14 @@ const ALL_SHADES: Shade[] = [
   { code: "0-11",    nameHe: "נייטרלייזר אפרפר",              nameAr: "محيد رمادي",               hex: "#A0A0A0" },
   { code: "0-00",    nameHe: "מחזק נייטרל",                   nameAr: "معزز محايد",               hex: "#D8D8D0" },
 ];
+
+// מאתר גוון לפי קוד בכל הקטלוגים הנתמכים (Igora + Three) — הקודים לא מתנגשים
+// בין המותגים (Igora תמיד עם מקף, Three עם נקודה/בלי מפריד/שם קוררקטור), כך
+// שאין דו-משמעות. Three נבדק ראשון כי THREE_SHADES_BY_CODE הוא Map (O(1)).
+function findShadeByCode(code: string | null | undefined): Shade | null {
+  if (!code) return null;
+  return THREE_SHADES_BY_CODE.get(code) ?? ALL_SHADES.find((s) => s.code === code) ?? null;
+}
 
 // ─── Process steps (bilingual, icon-keyed – outside translation dict) ─────────
 type StepIconKey = "flask" | "brush" | "flame" | "layers" | "leaf" | "clock" | "droplets" | "alert" | "sparkles" | "calendar" | "shield" | "zap";
@@ -583,8 +592,14 @@ const SPECIAL_LEVEL_12_CODES = new Set([
 const WARM_UNDERTONE_SUFFIXES = ["0", "3", "5", "6", "7", "8", "50", "60", "70", "80", "710"];
 const COOL_UNDERTONE_SUFFIXES = ["1", "11", "2", "19", "21", "22", "4", "12", "14", "46"];
 
+// טונים "חמים מאוד" של Three (נחושת/נחושת-זהב/מהגוני/אדום עמוק) — נבחר עבורם
+// קוררקטור חזק יותר (Blu) בניטרול, בדומה להבחנה sVeryWarm הקיימת ל-Igora למטה
+const THREE_VERY_WARM_TONE_SUFFIXES = new Set(["4", "43", "5", "66"]);
+
 function getShadeTemperature(code: string): "warm" | "cool" | "neutral" | null {
   if (!code) return null;
+  const threeShade = THREE_SHADES_BY_CODE.get(code);
+  if (threeShade) return threeShade.temperature;
   // Extract the numeric suffix after the dash (e.g., "7-50" → "50", "8-1" → "1")
   const parts = code.split("-");
   if (parts.length < 2) return null;
@@ -605,6 +620,18 @@ function detectNeutralization(currCode: string | null, destCode: string | null):
 
   // Rule: if current is WARM (yellow/orange) and dest is COOL (ash/grey), add purple/ash neutralizer
   if (currTemp === "warm" && destTemp === "cool") {
+    // הקוררקטור חייב להיות מאותו מותג כמו גוון היעד — לא ניתן לערבב קוד Igora
+    // לתוך נוסחת Three ולהפך
+    const isThreeTarget = THREE_SHADES_BY_CODE.has(destCode);
+    if (isThreeTarget) {
+      const currToneSuffix = currCode.split(".")[1];
+      const isVeryWarm = currToneSuffix !== undefined && THREE_VERY_WARM_TONE_SUFFIXES.has(currToneSuffix);
+      return {
+        neutralizerCode: isVeryWarm ? "blu" : "cenere", // כחול לניטרול כתום עז, אפור לניטרול חום כללי
+        ratio: 0.25,
+        reason: `Neutralize warm undertone (${currCode}) to achieve cool ash (${destCode})`,
+      };
+    }
     // Yellow (warm) is neutralized by violet/purple (0-99 or 0-22 pearl)
     // Determine if more yellow or more orange
     const currSuffix = currCode.split("-")[1];
@@ -621,6 +648,8 @@ function detectNeutralization(currCode: string | null, destCode: string | null):
 
 // ─── Formula engine ───────────────────────────────────────────────────────────
 function getLevel(code: string): number | null {
+  const threeShade = THREE_SHADES_BY_CODE.get(code);
+  if (threeShade) return threeShade.level;
   if (SPECIAL_LEVEL_12_CODES.has(code)) return 12;
   const m = code.match(/^(\d+(?:\.\d+)?)/);
   return m ? parseFloat(m[1]) : null;
@@ -1038,8 +1067,8 @@ function FormulaInner() {
 
   const t = T[lang];
 
-  const desiredShade  = ALL_SHADES.find((s) => s.code === desiredCode) ?? null;
-  const currentShade  = ALL_SHADES.find((s) => s.code === currentCode) ?? null;
+  const desiredShade  = findShadeByCode(desiredCode);
+  const currentShade  = findShadeByCode(currentCode);
   const desiredLevel  = desiredCode ? getLevel(desiredCode) : null;
   const devPct        = calcDeveloper(currentCode, desiredCode, condition, bleaching);
 
@@ -1080,7 +1109,7 @@ function FormulaInner() {
     condition === "normal"  ? "normal"    : "natural";
 
   const baseShadeHex = mix.baseCode
-    ? (ALL_SHADES.find((s) => s.code === mix.baseCode)?.hex ?? "#987840")
+    ? (findShadeByCode(mix.baseCode)?.hex ?? "#987840")
     : undefined;
 
   async function handleSaveFormula() {
@@ -1182,7 +1211,7 @@ function FormulaInner() {
         });
       }
       if (mix.baseCode) {
-        const baseObj = ALL_SHADES.find(s => s.code === mix.baseCode);
+        const baseObj = findShadeByCode(mix.baseCode);
         items.push({
           id: "base",
           labelHe: `בסיס טבעי – ${mix.baseCode}${baseObj ? ` ${baseObj.nameHe}` : ""}`,

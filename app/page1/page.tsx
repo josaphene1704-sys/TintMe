@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useConvexAuth } from "convex/react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { THREE_CATALOG } from "@/lib/colorCatalogs/three";
 import { cn } from "@/lib/utils";
 
 // ─── Translations ─────────────────────────────────────────────────────────────
@@ -358,8 +359,11 @@ function ColorCatalog({
   selectedCode: string | null;
   onSelect: (code: string) => void;
 }) {
+  const [brand, setBrand] = useState<"igora" | "three">("igora");
+  const categories = brand === "three" ? THREE_CATALOG.categories : CATEGORIES;
+
   const [activeId, setActiveId] = useState(CATEGORIES[0].id);
-  const active = CATEGORIES.find((c) => c.id === activeId) ?? CATEGORIES[0];
+  const active = categories.find((c) => c.id === activeId) ?? categories[0];
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -368,8 +372,26 @@ function ColorCatalog({
         <p className="mt-0.5 text-sm text-white/55">{t.catalogSub}</p>
       </div>
 
+      <div className="flex gap-1.5">
+        {(["igora", "three"] as const).map((b) => (
+          <button
+            key={b}
+            type="button"
+            onClick={() => setBrand(b)}
+            className={cn(
+              "flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-all duration-200",
+              brand === b
+                ? "bg-gradient-to-l from-fuchsia-500 to-violet-600 text-white shadow-[0_0_14px_2px_rgba(232,121,249,0.4)]"
+                : "bg-white/10 text-white/60 hover:bg-white/18 hover:text-white",
+            )}
+          >
+            {b === "igora" ? "Igora Royal" : "Three"}
+          </button>
+        ))}
+      </div>
+
       <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <button
             key={cat.id}
             type="button"
@@ -401,7 +423,9 @@ function ColorCatalog({
       </div>
 
       {selectedCode && (() => {
-        const found = CATEGORIES.flatMap((c) => c.shades).find((s) => s.code === selectedCode);
+        const found = [...CATEGORIES, ...THREE_CATALOG.categories]
+          .flatMap((c) => c.shades)
+          .find((s) => s.code === selectedCode);
         if (!found) return null;
         const name = lang === "he" ? found.nameHe : found.nameAr;
         return (

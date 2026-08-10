@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { THREE_CATALOG } from "@/lib/colorCatalogs/three";
 import { cn } from "@/lib/utils";
 
 // ─── Translations ─────────────────────────────────────────────────────────────
@@ -185,6 +186,7 @@ const CATEGORIES: Category[] = [
 ];
 
 const ALL_SHADES = CATEGORIES.flatMap((c) => c.shades);
+const ALL_SHADES_BOTH = [...ALL_SHADES, ...THREE_CATALOG.categories.flatMap((c) => c.shades)];
 
 // ─── Color chip ───────────────────────────────────────────────────────────────
 function ColorChip({
@@ -249,6 +251,7 @@ export default function DesiredHairPage() {
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [activeTab, setActiveTab]     = useState(CATEGORIES[0].id);
   const [isDragging, setIsDragging]   = useState(false);
+  const [brand, setBrand]             = useState<"igora" | "three">("igora");
   const fileInputRef                  = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -257,9 +260,10 @@ export default function DesiredHairPage() {
   }, []);
 
   const t          = T[lang];
-  const currentCat = CATEGORIES.find((c) => c.id === activeTab) ?? CATEGORIES[0];
+  const categories = brand === "three" ? THREE_CATALOG.categories : CATEGORIES;
+  const currentCat = categories.find((c) => c.id === activeTab) ?? categories[0];
   const canGo      = !!selectedCode;
-  const selectedShadeObj = selectedCode ? ALL_SHADES.find((s) => s.code === selectedCode) : null;
+  const selectedShadeObj = selectedCode ? ALL_SHADES_BOTH.find((s) => s.code === selectedCode) : null;
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -425,12 +429,31 @@ export default function DesiredHairPage() {
               <p className="mt-0.5 text-xs text-white/40">{t.catalogSub}</p>
             </div>
 
+            {/* Brand switcher */}
+            <div className="flex gap-1.5 px-5 pt-1">
+              {(["igora", "three"] as const).map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setBrand(b)}
+                  className={cn(
+                    "flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-all duration-200",
+                    brand === b
+                      ? "bg-gradient-to-l from-fuchsia-600 to-violet-600 text-white shadow-lg shadow-fuchsia-900/40"
+                      : "border border-white/15 bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white/90",
+                  )}
+                >
+                  {b === "igora" ? "Igora Royal" : "Three"}
+                </button>
+              ))}
+            </div>
+
             {/* Category tabs */}
             <div
               className="flex gap-1.5 overflow-x-auto px-5 py-3"
               style={{ scrollbarWidth: "none" }}
             >
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"

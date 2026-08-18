@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { shadeImageSrc } from "@/lib/colorCatalogs/shadeImage";
 import { THREE_CATALOG } from "@/lib/colorCatalogs/three";
 import { cn } from "@/lib/utils";
 
@@ -215,7 +216,7 @@ function ColorChip({
     >
       <div className="aspect-square w-full overflow-hidden">
         <Image
-          src={`/hair-colors/${shade.code}.png`}
+          src={shadeImageSrc(shade.code)}
           alt={name}
           width={80}
           height={80}
@@ -498,7 +499,7 @@ export default function DesiredHairPage() {
                   className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border-2 border-fuchsia-400/50 shadow-[0_0_10px_2px_rgba(232,121,249,0.4)]"
                 >
                   <Image
-                    src={`/hair-colors/${selectedShadeObj.code}.png`}
+                    src={shadeImageSrc(selectedShadeObj.code)}
                     alt={selectedShadeObj.code}
                     fill
                     className="object-cover"

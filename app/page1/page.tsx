@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useConvexAuth } from "convex/react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { shadeImageSrc } from "@/lib/colorCatalogs/shadeImage";
 import { THREE_CATALOG } from "@/lib/colorCatalogs/three";
 import { cn } from "@/lib/utils";
 
@@ -320,7 +321,7 @@ function ColorChip({
       <div className="aspect-square w-full overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/hair-colors/${shade.code}.png`}
+          src={shadeImageSrc(shade.code)}
           alt={name}
           loading="lazy"
           className="h-full w-full object-cover bg-white"

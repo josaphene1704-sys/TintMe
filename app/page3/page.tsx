@@ -32,6 +32,7 @@ import {
   Zap,
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
+import { shadeImageSrc } from "@/lib/colorCatalogs/shadeImage";
 import { THREE_SHADES_BY_CODE } from "@/lib/colorCatalogs/three";
 import { cn } from "@/lib/utils";
 
@@ -835,7 +836,7 @@ function ShadeImage({ code, hex }: { code: string; hex: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/hair-colors/${code}.png`}
+      src={shadeImageSrc(code)}
       alt={code}
       className="h-full w-full object-cover"
       onError={() => setImgErr(true)}
@@ -1664,7 +1665,7 @@ function FormulaInner() {
                     <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border-2 border-white/25 shadow-md">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`/hair-colors/${desiredShade.code}.png`}
+                        src={shadeImageSrc(desiredShade.code)}
                         alt={desiredShade.code}
                         className="h-full w-full object-cover"
                         onError={(e) => {

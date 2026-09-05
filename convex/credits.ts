@@ -38,6 +38,22 @@ export function getBotQuota(user: Doc<"users">) {
   return { total, used, remaining };
 }
 
+// ── מכסת ניתוחי תמונה ───────────────────────────────────────────────────────
+// ניתוח תמונה עולה ~0.14 סנט — פחות מרבע מסבב שיחה עם הבוט — ולכן הוא חינם.
+// אבל "חינם" לא אומר "בלי מונה": ההרשמה פתוחה, וללא תקרה כלשהי אפשר לפתוח
+// חשבונות ולשרוף את תקציב ה-API. 4 ניתוחים מכסים נוכחי + רצוי + שני צילומים
+// חוזרים אחרי תוצאה בביטחון נמוך.
+export const FREE_PHOTO_ANALYSES = 4;
+
+export function getPhotoQuota(user: Doc<"users">) {
+  const used = user.photoAnalysesUsed ?? 0;
+  return {
+    total: FREE_PHOTO_ANALYSES,
+    used,
+    remaining: Math.max(0, FREE_PHOTO_ANALYSES - used),
+  };
+}
+
 // ── קריאה מנורמלת של המונים ─────────────────────────────────────────────────
 // משתמשים ותיקים נוצרו לפני הפיצ'ר ואין להם את השדות כלל.
 export function getUserCredits(user: Doc<"users">) {
@@ -243,6 +259,110 @@ export const refundBotQuestion = mutation({
       updatedAt: Date.now(),
     });
     return null;
+  },
+});
+
+// ── ניצול ניתוח תמונה ───────────────────────────────────────────────────────
+// נקרא מ-app/api/analyze-hair/route.ts לפני הפנייה ל-Anthropic, מאותה סיבה
+// שהניכוי של הבוט חייב לרוץ בשרת: כל מונה בצד הלקוח ניתן לעקיפה.
+//
+// סדר הגבייה: קודם המכסה החינמית, ורק כשהיא נגמרת נגרעת שאלת בוט. כך לקוחה
+// שרכשה חבילה לא נתקעת אחרי 4 ניתוחים, ולקוחה חדשה לא משלמת משאלות הבוט שלה
+// על משהו שהוגדר כחינמי.
+export const consumePhotoAnalysis = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return { ok: false as const, reason: "unauthenticated" as const };
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return { ok: false as const, reason: "unauthenticated" as const };
+    }
+
+    const photo = getPhotoQuota(user);
+    if (photo.remaining > 0) {
+      await ctx.db.patch(userId, {
+        photoAnalysesUsed: photo.used + 1,
+        updatedAt: Date.now(),
+      });
+      return {
+        ok: true as const,
+        source: "free" as const,
+        freeRemaining: photo.remaining - 1,
+        freeTotal: photo.total,
+      };
+    }
+
+    const bot = getBotQuota(user);
+    if (bot.remaining <= 0) {
+      return { ok: false as const, reason: "exhausted" as const };
+    }
+
+    await ctx.db.patch(userId, {
+      botQuestionsTotal: bot.total,
+      botQuestionsUsed: bot.used + 1,
+      botQuestionsRemaining: bot.remaining - 1,
+      updatedAt: Date.now(),
+    });
+    return {
+      ok: true as const,
+      source: "bot" as const,
+      freeRemaining: 0,
+      freeTotal: photo.total,
+      botRemaining: bot.remaining - 1,
+      botTotal: bot.total,
+    };
+  },
+});
+
+// החזרת ניתוח שנוכה כאשר הקריאה נכשלה אצלנו. ה-route מעביר את המקור שנגבה
+// בפועל, כדי שהזיכוי יחזור לאותו מאגר. חסום כלפי מעלה ע"י `used` — בדיוק כמו
+// refundBotQuestion — כך שאי אפשר להשתמש בו כדי לייצר מכסה יש מאין.
+export const refundPhotoAnalysis = mutation({
+  args: { source: v.union(v.literal("free"), v.literal("bot")) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    if (args.source === "free") {
+      const photo = getPhotoQuota(user);
+      if (photo.used <= 0) return null; // אין מה להחזיר
+      await ctx.db.patch(userId, {
+        photoAnalysesUsed: photo.used - 1,
+        updatedAt: Date.now(),
+      });
+      return null;
+    }
+
+    const bot = getBotQuota(user);
+    if (bot.used <= 0) return null;
+    await ctx.db.patch(userId, {
+      botQuestionsTotal: bot.total,
+      botQuestionsUsed: bot.used - 1,
+      botQuestionsRemaining: Math.min(bot.total, bot.remaining + 1),
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+// ── שליפת מכסת ניתוחי התמונה עבור ה-UI ──────────────────────────────────────
+export const getMyPhotoQuota = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    return { ...getPhotoQuota(user), bot: getBotQuota(user) };
   },
 });
 

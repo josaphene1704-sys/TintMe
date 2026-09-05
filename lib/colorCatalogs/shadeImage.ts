@@ -2,15 +2,22 @@
 // בחירת תמונת swatch לגוון — לפי קוד הגוון
 // ============================================================================
 // תמונות Igora Royal יושבות ב-public/hair-colors/{code}.png (קודים עם מקף,
-// למשל "6-34"). תמונות קטלוג Three יושבות ב-public/hair-colors-three/{code}.jpg
-// (צילומי הקטלוג הפיזי שסופקו על ידי המשתמשת — כרגע רק סדרת הטבעיים).
+// למשל "6-34"). תמונות קטלוג Three יושבות ב-public/hair-colors-three/{code}.jpg.
 // אין התנגשות בין המרחבים: קודי Igora תמיד מכילים מקף, קודי Three לא.
+//
+// בעבר הייתה כאן רשימה קשיחה של קודי Three שיש להם צילום. זה נשבר בפועל:
+// התיקייה התמלאה בעשרות תמונות שהרשימה לא הכירה, והן נפלו לנתיב של Igora
+// והחזירו 404. מכיוון שקטלוג Three ממשיך להתמלא בתמונות, השיוך נגזר עכשיו
+// מהקטלוג עצמו — אפשר להוסיף קובץ לתיקייה בלי לגעת בקוד.
+//
+// קוד Three שעדיין אין לו קובץ יחזיר 404, ומרכיבי התצוגה (ShadeImage /
+// ColorChip / ShadeSuggestion) נופלים ב-onError ל-Swatch המדורג. כלומר חוסר
+// תמונה מתבטא ב-gradient, לא באייקון שבור.
 
-// קודי Three שיש להם צילום אמיתי בתיקייה public/hair-colors-three
-const THREE_IMAGE_CODES = new Set(["1B", "1", "3", "4", "5", "6", "7", "8", "9", "10"]);
+import { THREE_SHADES_BY_CODE } from "./three";
 
 export function shadeImageSrc(code: string): string {
-  return THREE_IMAGE_CODES.has(code)
+  return THREE_SHADES_BY_CODE.has(code)
     ? `/hair-colors-three/${code}.jpg`
     : `/hair-colors/${code}.png`;
 }

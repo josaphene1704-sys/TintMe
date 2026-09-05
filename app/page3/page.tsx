@@ -32,94 +32,16 @@ import {
   Zap,
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
+import { findShadeByCode } from "@/lib/colorCatalogs/match";
+import type { Shade } from "@/lib/colorCatalogs/types";
 import { shadeImageSrc } from "@/lib/colorCatalogs/shadeImage";
 import { THREE_SHADES_BY_CODE } from "@/lib/colorCatalogs/three";
 import { cn } from "@/lib/utils";
 
 // ─── Shade catalog ────────────────────────────────────────────────────────────
-interface Shade { code: string; nameHe: string; nameAr: string; hex: string }
+// הקטלוגים והחיפוש לפי קוד מוגדרים פעם אחת ב-lib/colorCatalogs (ראו match.ts),
+// כך שהקוד שמזין את מנוע הנוסחה הוא בדיוק זה שהוצג ללקוחה ב-page1/page1b.
 
-const ALL_SHADES: Shade[] = [
-  { code: "1-0",     nameHe: "שחור טבעי",                    nameAr: "أسود طبيعي",              hex: "#0D0D0D" },
-  { code: "3-0",     nameHe: "חום כהה טבעי",                  nameAr: "بني غامق طبيعي",          hex: "#251510" },
-  { code: "4-0",     nameHe: "חום בינוני טבעי",               nameAr: "بني متوسط طبيعي",         hex: "#4A2A15" },
-  { code: "4-60",    nameHe: "חום שוקולד",                    nameAr: "بني شوكولاتة",            hex: "#6A4A2A" },
-  { code: "5-0",     nameHe: "חום בהיר טבעי",                 nameAr: "بني فاتح طبيعي",          hex: "#5A3620" },
-  { code: "5-00",    nameHe: "חום בהיר טבעי אינטנסיב",        nameAr: "بني فاتح مكثف",           hex: "#5C3820" },
-  { code: "5-1",     nameHe: "חום בהיר אפרפר",                nameAr: "بني فاتح رمادي",          hex: "#4E3C30" },
-  { code: "5-13",    nameHe: "חום בהיר אפרפר זהב",            nameAr: "بني فاتح رمادي ذهبي",    hex: "#5A4228" },
-  { code: "5-21",    nameHe: "חום בהיר פנינה אפרפר",          nameAr: "بني لؤلؤي رمادي",        hex: "#5A4044" },
-  { code: "5-50",    nameHe: "חום בהיר זהב",                  nameAr: "بني فاتح ذهبي",           hex: "#9A7A4A" },
-  { code: "5-60",    nameHe: "חום בהיר שוקולד",               nameAr: "بني شوكولاتة فاتح",       hex: "#8A6A4A" },
-  { code: "5-80",    nameHe: "חום בהיר אדום",                 nameAr: "بني فاتح أحمر",           hex: "#7A1E1E" },
-  { code: "6-0",     nameHe: "בלונד כהה טבעי",                nameAr: "أشقر غامق طبيعي",         hex: "#785832" },
-  { code: "6-00",    nameHe: "בלונד כהה טבעי אינטנסיב",       nameAr: "أشقر غامق مكثف",          hex: "#7A5A30" },
-  { code: "6-1",     nameHe: "בלונד כהה אפרפר",               nameAr: "أشقر غامق رمادي",         hex: "#6A5848" },
-  { code: "6-12",    nameHe: "בלונד כהה אפרפר פנינה",         nameAr: "أشقر غامق لؤلؤي",        hex: "#6A5C5C" },
-  { code: "6-50",    nameHe: "בלונד כהה זהב",                 nameAr: "أشقر غامق ذهبي",          hex: "#A88A4A" },
-  { code: "6-70",    nameHe: "בלונד כהה מהוגני",              nameAr: "أشقر غامق ماهوجني",       hex: "#7A3A2A" },
-  { code: "6-80",    nameHe: "בלונד כהה אדום",                nameAr: "أشقر غامق أحمر",          hex: "#7A2A2A" },
-  { code: "7-0",     nameHe: "בלונד בינוני טבעי",             nameAr: "أشقر وسط طبيعي",          hex: "#987840" },
-  { code: "7-00",    nameHe: "בלונד בינוני טבעי אינטנסיב",    nameAr: "أشقر وسط مكثف",           hex: "#9A7A3A" },
-  { code: "7-1",     nameHe: "בלונד בינוני אפרפר",            nameAr: "أشقر وسط رمادي",          hex: "#887868" },
-  { code: "7-21",    nameHe: "בלונד בינוני פנינה אפרפר",      nameAr: "أشقر وسط لؤلؤي",         hex: "#908080" },
-  { code: "7-24",    nameHe: "בלונד בינוני פנינה בז'",        nameAr: "أشقر وسط لؤلؤي بيج",     hex: "#9A8870" },
-  { code: "7-50",    nameHe: "בלונד בינוני זהב",              nameAr: "أشقر وسط ذهبي",           hex: "#C0A05A" },
-  { code: "7-60",    nameHe: "בלונד בינוני שוקולד",           nameAr: "أشقر وسط شوكولاتة",       hex: "#A0704A" },
-  { code: "7-70",    nameHe: "בלונד בינוני מהוגני",           nameAr: "أشقر وسط ماهوجني",        hex: "#8A4A3A" },
-  { code: "7-710",   nameHe: "בלונד בינוני מהוגני טבעי",      nameAr: "أشقر وسط ماهوجني طبيعي",  hex: "#8A5A4A" },
-  { code: "8-0",     nameHe: "בלונד בהיר טבעי",               nameAr: "أشقر فاتح طبيعي",         hex: "#BEA062" },
-  { code: "8-00",    nameHe: "בלונד בהיר טבעי אינטנסיב",      nameAr: "أشقر فاتح مكثف",          hex: "#C0A060" },
-  { code: "8-1",     nameHe: "בלונד בהיר אפרפר",              nameAr: "أشقر فاتح رمادي",         hex: "#A89888" },
-  { code: "8-11",    nameHe: "בלונד בהיר אפרפר כפול",         nameAr: "أشقر فاتح رمادي مضاعف",  hex: "#A09898" },
-  { code: "8-19",    nameHe: "בלונד בהיר אפרפר סגול",         nameAr: "أشقر فاتح رمادي بنفسجي", hex: "#9090A8" },
-  { code: "8-21",    nameHe: "בלונד בהיר פנינה אפרפר",        nameAr: "أشقر فاتح لؤلؤي",         hex: "#B8AAAA" },
-  { code: "8-50",    nameHe: "בלונד בהיר זהב",                nameAr: "أشقر فاتح ذهبي",          hex: "#D2B46A" },
-  { code: "8-60",    nameHe: "בלונד בהיר שוקולד",             nameAr: "أشقر فاتح شوكولاتة",      hex: "#B88A5A" },
-  { code: "9-0",     nameHe: "בלונד בהיר מאוד טבעי",          nameAr: "أشقر فاتح جداً",          hex: "#D2B668" },
-  { code: "9-00",    nameHe: "בלונד בהיר מאוד אינטנסיב",      nameAr: "أشقر فاتح جداً مكثف",     hex: "#D4B870" },
-  { code: "9-1",     nameHe: "בלונד בהיר מאוד אפרפר",         nameAr: "أشقر فاتح جداً رمادي",    hex: "#C0B0A0" },
-  { code: "9-24",    nameHe: "בלונד בהיר מאוד פנינה בז'",     nameAr: "أشقر فاتح جداً لؤلؤي",    hex: "#CCBAA8" },
-  { code: "9-50",    nameHe: "בלונד בהיר מאוד זהב",           nameAr: "أشقر فاتح جداً ذهبي",     hex: "#E5C46A" },
-  { code: "9-60",    nameHe: "בלונד בהיר מאוד שוקולד",        nameAr: "أشقر فاتح جداً شوكولاتة",  hex: "#C89A6A" },
-  { code: "9.5-1",   nameHe: "פסטל אפרפר",                    nameAr: "باستيل رمادي",            hex: "#D8D0C8" },
-  { code: "9.5-22",  nameHe: "פסטל פנינה",                    nameAr: "باستيل لؤلؤي",            hex: "#D8D0E8" },
-  { code: "9.5-31",  nameHe: "פסטל בז' זהב",                  nameAr: "باستيل بيج ذهبي",         hex: "#E0C8A8" },
-  { code: "9.5-4",   nameHe: "פסטל בז'",                      nameAr: "باستيل بيج",              hex: "#E6D2B8" },
-  { code: "9.5-49",  nameHe: "פסטל בז' נחושת",                nameAr: "باستيل بيج نحاسي",        hex: "#D8B48A" },
-  { code: "10-0",    nameHe: "בלונד טבעי",                    nameAr: "أشقر طبيعي",              hex: "#F0E8D8" },
-  { code: "10-1",    nameHe: "בלונד אפרפר",                   nameAr: "أشقر رمادي",               hex: "#E0D8C8" },
-  { code: "10-4",    nameHe: "בלונד בז'",                     nameAr: "أشقر بيج",                hex: "#E8D2B8" },
-  { code: "10-14",   nameHe: "בלונד אפרפר בז'",               nameAr: "أشقر رمادي بيج",          hex: "#E4D4C4" },
-  { code: "10-21",   nameHe: "בלונד פנינה אפרפר",             nameAr: "أشقر لؤلؤي رمادي",        hex: "#E6D8CC" },
-  { code: "10-46",   nameHe: "בלונד בז' נחושת",               nameAr: "أشقر بيج نحاسي",          hex: "#E0B88A" },
-  { code: "12-0",    nameHe: "אולטרה בלונד טבעי",             nameAr: "أشقر فائق طبيعي",         hex: "#F4ECDC" },
-  { code: "12-1",    nameHe: "אולטרה בלונד אפרפר",            nameAr: "أشقر فائق رمادي",         hex: "#E8E0D0" },
-  { code: "12-2",    nameHe: "אולטרה בלונד פנינה",            nameAr: "أشقر فائق لؤلؤي",         hex: "#E8DCE8" },
-  { code: "12-4",    nameHe: "אולטרה בלונד בז'",              nameAr: "أشقر فائق بيج",           hex: "#EAD8C4" },
-  { code: "12-11",   nameHe: "אולטרה בלונד אפרפר כפול",       nameAr: "أشقر فائق رمادي مضاعف",   hex: "#E0D8C8" },
-  { code: "12-19",   nameHe: "אולטרה בלונד אפרפר סגול",       nameAr: "أشقر فائق رمادي بنفسجي",  hex: "#D8C8D8" },
-  { code: "slate-grey", nameHe: "אפור כהה",                   nameAr: "رمادي داكن",              hex: "#7A7A7A" },
-  { code: "grey-lilac", nameHe: "אפור לילך",                  nameAr: "رمادي ليلكي",             hex: "#8A7A8A" },
-  { code: "dove-grey",  nameHe: "אפור יונה",                  nameAr: "رمادي حمامة",             hex: "#B0B0B0" },
-  { code: "silver",     nameHe: "סילבר",                      nameAr: "فضي",                     hex: "#C8C8C8" },
-  { code: "0-99",    nameHe: "בוסטר סגול",                    nameAr: "معزز بنفسجي",             hex: "#6A2A8A" },
-  { code: "L-89",    nameHe: "אופנה אדום-סגול",               nameAr: "موضة أحمر-بنفسجي",        hex: "#8A2A5A" },
-  { code: "0-89",    nameHe: "בוסטר אדום-סגול",               nameAr: "معزز أحمر-بنفسجي",        hex: "#8A2A5A" },
-  { code: "0-33",    nameHe: "נייטרלייזר זהב",                nameAr: "محيد ذهبي",                hex: "#C8A84A" },
-  { code: "L-88",    nameHe: "אופנה סגול",                    nameAr: "موضة بنفسجي",             hex: "#7A2A8A" },
-  { code: "0-22",    nameHe: "נייטרלייזר פנינה",              nameAr: "محيد لؤلؤي",               hex: "#C0C0D8" },
-  { code: "0-11",    nameHe: "נייטרלייזר אפרפר",              nameAr: "محيد رمادي",               hex: "#A0A0A0" },
-  { code: "0-00",    nameHe: "מחזק נייטרל",                   nameAr: "معزز محايد",               hex: "#D8D8D0" },
-];
-
-// מאתר גוון לפי קוד בכל הקטלוגים הנתמכים (Igora + Three) — הקודים לא מתנגשים
-// בין המותגים (Igora תמיד עם מקף, Three עם נקודה/בלי מפריד/שם קוררקטור), כך
-// שאין דו-משמעות. Three נבדק ראשון כי THREE_SHADES_BY_CODE הוא Map (O(1)).
-function findShadeByCode(code: string | null | undefined): Shade | null {
-  if (!code) return null;
-  return THREE_SHADES_BY_CODE.get(code) ?? ALL_SHADES.find((s) => s.code === code) ?? null;
-}
 
 // ─── Process steps (bilingual, icon-keyed – outside translation dict) ─────────
 type StepIconKey = "flask" | "brush" | "flame" | "layers" | "leaf" | "clock" | "droplets" | "alert" | "sparkles" | "calendar" | "shield" | "zap";
@@ -1157,8 +1079,10 @@ function FormulaInner() {
   function handleRestart() {
     localStorage.removeItem("tintme_current_shade");
     localStorage.removeItem("tintme_desired_shade");
-    sessionStorage.removeItem("tintme_current_photo");
-    sessionStorage.removeItem("tintme_desired_photo");
+    // התמונות נכתבות ל-localStorage (page1/page1b) — ניקוי מ-sessionStorage
+    // פשוט לא עשה כלום, והתמונות שרדו לאבחון הבא.
+    localStorage.removeItem("tintme_current_photo");
+    localStorage.removeItem("tintme_desired_photo");
     router.push("/");
   }
 

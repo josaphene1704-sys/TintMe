@@ -6,7 +6,10 @@ import {
 import type { NextRequest } from "next/server";
 
 // הגדרת נתיבים ציבוריים (שלא דורשים אימות)
-const isPublicRoute = createRouteMatcher(["/", "/sign-in", "/sign-up", "/page1", "/page1b", "/page2", "/page3", "/api/chat"]);
+// /api/chat ו-/api/analyze-hair "ציבוריים" רק במובן שה-middleware לא מפנה
+// אותם ל-sign-in — השער האמיתי הוא בדיקת convexAuthNextjsToken() בתוך הנתיב,
+// שם גם נגבית המכסה. redirect מ-middleware על נתיב API היה מחזיר HTML לפצ'.
+const isPublicRoute = createRouteMatcher(["/", "/sign-in", "/sign-up", "/page1", "/page1b", "/page2", "/page3", "/api/chat", "/api/analyze-hair"]);
 
 // Middleware לבדיקת אימות והפניות
 export default convexAuthNextjsMiddleware(async (request: NextRequest, ctx) => {

@@ -114,14 +114,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "API key not configured" }, { status: 500 });
   }
 
-  const quota = await convex.mutation(api.credits.consumeBotQuestion, {});
+  // ניתוח תמונה חינם עד FREE_PHOTO_ANALYSES, ורק אחר כך גורע שאלת בוט.
+  const quota = await convex.mutation(api.credits.consumePhotoAnalysis, {});
   if (!quota.ok) {
     const text =
       quota.reason === "exhausted"
-        ? "נגמרו לך השאלות. רכשי חבילת אבחונים כדי לנתח תמונות נוספות."
+        ? "נגמרו לך הניתוחים החינמיים והשאלות. רכשי חבילת אבחונים כדי להמשיך."
         : "יש להתחבר כדי לנתח תמונה.";
     return NextResponse.json(
-      { error: quota.reason, text, remaining: quota.remaining, total: quota.total },
+      { error: quota.reason, text },
       { status: quota.reason === "exhausted" ? 402 : 401 }
     );
   }
@@ -158,9 +159,9 @@ export async function POST(req: NextRequest) {
     const text = response.content[0]?.type === "text" ? response.content[0].text : "";
     const reading = parseColorReading(extractJson(text));
 
-    // פלט לא תקין הוא כישלון שלנו, לא של המשתמשת — מחזירים את השאלה.
+    // פלט לא תקין הוא כישלון שלנו, לא של המשתמשת — מחזירים את הניתוח שנגבה.
     if (!reading) {
-      await convex.mutation(api.credits.refundBotQuestion, {});
+      await convex.mutation(api.credits.refundPhotoAnalysis, { source: quota.source });
       return NextResponse.json({ error: "unreadable" }, { status: 422 });
     }
 
@@ -169,13 +170,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       reading,
       candidates,
-      remaining: quota.remaining,
-      total: quota.total,
+      source: quota.source,
+      freeRemaining: quota.freeRemaining,
+      freeTotal: quota.freeTotal,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Hair analysis error:", message);
-    await convex.mutation(api.credits.refundBotQuestion, {});
+    await convex.mutation(api.credits.refundPhotoAnalysis, { source: quota.source });
     return NextResponse.json({ error: "Internal server error", detail: message }, { status: 500 });
   }
 }

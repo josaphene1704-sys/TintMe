@@ -36,7 +36,9 @@ const T = {
     disclaimer: "התאורה בתמונה משפיעה על הזיהוי. תמיד אפשר לבחור ידנית מהקטלוג.",
     lowConfidence: "התמונה קשה לקריאה (תאורה, פילטר או צבע לא אחיד). כדאי לצלם באור טבעי — בינתיים עדיף לבחור ידנית.",
     noMatch: "לא נמצאו גוונים מתאימים בקטלוג הזה. נסי את המותג השני או בחרי ידנית.",
-    remaining: (n: number) => `נותרו ${n} שימושים`,
+    freeRemaining: (n: number) => `${n} ניתוחים חינם נותרו`,
+    freeLast: "הניתוח החינמי האחרון שלך",
+    fromBot: (n: number) => `נגמרו הניתוחים החינמיים — יגרע משאלות הבוט (${n} נותרו)`,
     errGeneric: "הזיהוי נכשל. אפשר לנסות שוב או לבחור ידנית מהקטלוג.",
     errUnreadable: "לא הצלחתי לקרוא את התמונה. נסי תמונה ברורה יותר של השיער.",
     errAuth: "יש להתחבר כדי לנתח תמונה.",
@@ -54,7 +56,9 @@ const T = {
     disclaimer: "الإضاءة في الصورة تؤثر على التعرف. يمكنك دائماً الاختيار يدوياً من الكتالوج.",
     lowConfidence: "الصورة صعبة القراءة (إضاءة، فلتر أو لون غير متجانس). يُفضّل التصوير بضوء طبيعي — حالياً الأفضل الاختيار يدوياً.",
     noMatch: "لم يتم العثور على درجات مناسبة في هذا الكتالوج. جرّبي العلامة الأخرى أو اختاري يدوياً.",
-    remaining: (n: number) => `تبقى ${n} استخدامات`,
+    freeRemaining: (n: number) => `تبقى ${n} تحليلات مجانية`,
+    freeLast: "تحليلك المجاني الأخير",
+    fromBot: (n: number) => `انتهت التحليلات المجانية — سيُخصم من أسئلة البوت (${n} متبقية)`,
     errGeneric: "فشل التعرف. يمكنك المحاولة مجدداً أو الاختيار يدوياً.",
     errUnreadable: "لم أتمكن من قراءة الصورة. جرّبي صورة أوضح للشعر.",
     errAuth: "يجب تسجيل الدخول لتحليل الصورة.",
@@ -65,6 +69,14 @@ const T = {
 } as const;
 
 type Status = "idle" | "loading" | "done" | "error";
+
+type PhotoQuota = { remaining: number; total: number; bot: { remaining: number } };
+
+function quotaLabel(t: (typeof T)[Lang], quota: PhotoQuota): string {
+  if (quota.remaining > 1) return t.freeRemaining(quota.remaining);
+  if (quota.remaining === 1) return t.freeLast;
+  return t.fromBot(quota.bot.remaining);
+}
 
 export function ShadeSuggestion({
   lang,
@@ -83,7 +95,7 @@ export function ShadeSuggestion({
   onSelect: (code: string) => void;
 }) {
   const t = T[lang];
-  const quota = useQuery(api.credits.getMyBotQuota);
+  const quota = useQuery(api.credits.getMyPhotoQuota);
 
   const [status, setStatus] = useState<Status>("idle");
   const [reading, setReading] = useState<ColorReading | null>(null);
@@ -202,9 +214,11 @@ export function ShadeSuggestion({
         </div>
       )}
 
-      {quota !== undefined && quota !== null && status !== "done" && (
+      {/* המונה מודיע מראש כשהניתוח הבא כבר לא חינמי, כדי שהלקוחה לא תגלה
+          בדיעבד ששאלת בוט נגרעה ממנה. */}
+      {quota && status !== "done" && (
         <p className="mt-2 text-center text-[11px] text-white/35">
-          {t.remaining(quota.remaining)}
+          {quotaLabel(t, quota)}
         </p>
       )}
     </div>

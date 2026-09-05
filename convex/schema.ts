@@ -54,6 +54,14 @@ export default defineSchema({
     botQuestionsTotal: v.optional(v.number()), // סך השאלות שהוקצו אי פעם
     botQuestionsUsed: v.optional(v.number()), // כמה שאלות נשאלו
     botQuestionsRemaining: v.optional(v.number()), // כמה נשארו
+
+    // ── ניתוחי תמונה חינם ─────────────────────────────────────────────────
+    // מונה נפרד ומכוון: ניתוח עולה ~0.14 סנט, הרבה פחות מסבב שיחה עם הבוט,
+    // ואם הוא היה נגרע מ-botQuestions אז ניתוח של הנוכחי + הרצוי היה שורף
+    // שני שלישים מהמכסה עוד לפני שהלקוחה ראתה נוסחה.
+    // רק מונה עולה — התקרה היא הקבוע FREE_PHOTO_ANALYSES, כדי שאפשר יהיה
+    // לשנות אותה בקוד בלי מיגרציה. אופציונלי לתאימות לאחור כמו השאר.
+    photoAnalysesUsed: v.optional(v.number()), // כמה ניתוחי תמונה חינם נוצלו
   })
     .index("by_email", ["email"]) // אינדקס לחיפוש מהיר לפי אימייל
     .index("by_role", ["role"]) // אינדקס לסינון מהיר לפי תפקיד

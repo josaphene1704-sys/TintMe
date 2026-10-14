@@ -19,6 +19,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import CreditsWidget from "@/components/credits/CreditsWidget";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PLAN_DISPLAY } from "@/config/planDisplay";
 import { api } from "@/convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -52,6 +59,17 @@ const translations = {
     freeGiftGuestSub: "הירשמי עכשיו וקבלי את האבחון הראשון שלך בחינם.",
     freeUsedTitle: "ניצלת כבר את האבחון החינמי",
     freeUsedSub: "לאבחונים נוספים, בחרי חבילה ←",
+    checkoutNoticeTitle: "לפני המעבר לתשלום",
+    checkoutNoticeBody:
+      "דף התשלום שייך לחברת הסליקה Polar ומוצג באנגלית. אפשר לתרגם אותו לעברית דרך הדפדפן:",
+    checkoutNoticeSteps: [
+      "במחשב (Chrome): לחיצה ימנית על הדף ← \"תרגם לעברית\"",
+      "באנדרואיד (Chrome): תפריט ⋮ ← \"תרגם...\"",
+      "באייפון (Safari): כפתור \"aA\" בשורת הכתובת ← \"תרגם לעברית\"",
+    ],
+    checkoutNoticeSecure: "🔒 התשלום מאובטח ומתבצע ישירות מול Polar.",
+    checkoutNoticeContinue: "הבנתי, המשיכי לתשלום",
+    checkoutNoticeCancel: "ביטול",
     packagesTitle: "הצעת חבילות",
     packagesSub: "בחרי את המסלול המתאים לך",
     upgradeBtn: "שדרגי עכשיו",
@@ -90,6 +108,17 @@ const translations = {
     freeGiftGuestSub: "سجّلي الآن واحصلي على تشخيصكِ الأول مجاناً.",
     freeUsedTitle: "لقد استخدمتِ التشخيص المجاني بالفعل",
     freeUsedSub: "لمزيد من التشخيصات، اختاري باقة ←",
+    checkoutNoticeTitle: "قبل الانتقال إلى الدفع",
+    checkoutNoticeBody:
+      "صفحة الدفع تابعة لشركة الدفع Polar وتظهر باللغة الإنجليزية. يمكن ترجمتها إلى العربية عبر المتصفح:",
+    checkoutNoticeSteps: [
+      "على الكمبيوتر (Chrome): انقري بالزر الأيمن على الصفحة ← \"ترجمة إلى العربية\"",
+      "على أندرويد (Chrome): القائمة ⋮ ← \"ترجمة...\"",
+      "على آيفون (Safari): زر \"aA\" في شريط العنوان ← \"ترجمة إلى العربية\"",
+    ],
+    checkoutNoticeSecure: "🔒 الدفع آمن ويتم مباشرة عبر Polar.",
+    checkoutNoticeContinue: "فهمت، متابعة للدفع",
+    checkoutNoticeCancel: "إلغاء",
     packagesTitle: "عروض الباقات",
     packagesSub: "اختاري الخطة المناسبة لكِ",
     upgradeBtn: "ترقية الآن",
@@ -157,6 +186,10 @@ export default function Home() {
   const [showPaywallAlert, setShowPaywallAlert] = useState(false);
   const [buyingPlan, setBuyingPlan] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState("");
+  // החבילה שממתינה לאישור הודעת "דף התשלום באנגלית" לפני המעבר ל-Polar
+  const [pendingPlan, setPendingPlan] = useState<{ planId: string; productId: string } | null>(
+    null
+  );
 
   const packagesRef = useRef<HTMLDivElement>(null);
   const paywallAlertRef = useRef<HTMLDivElement>(null);
@@ -267,6 +300,24 @@ export default function Home() {
           : "حدث خطأ أثناء إنشاء رابط الدفع. حاولي مرة أخرى."
       );
     }
+  }
+
+  // לחיצה על "שדרגי עכשיו": קודם הודעה שדף התשלום של Polar באנגלית ואיך
+  // לתרגם אותו. אורחת (מופנית להתחברות) או חבילה לא מוגדרת (הודעת שגיאה)
+  // לא מגיעות לדף התשלום, ולכן עוברות ישר ל-handleBuy בלי ההודעה.
+  function requestBuy(planId: string, productId: string | undefined) {
+    if (!isAuthenticated || !productId) {
+      handleBuy(planId, productId);
+      return;
+    }
+    setPendingPlan({ planId, productId });
+  }
+
+  function confirmBuy() {
+    if (!pendingPlan) return;
+    const { planId, productId } = pendingPlan;
+    setPendingPlan(null);
+    handleBuy(planId, productId);
   }
 
   const ctaLabel = isAuthenticated && !isBlocked ? t.ctaStart : t.cta;
@@ -546,7 +597,7 @@ export default function Home() {
               </ul>
               <button
                 type="button"
-                onClick={() => handleBuy("pack_1", PACK_1_ID)}
+                onClick={() => requestBuy("pack_1", PACK_1_ID)}
                 disabled={buyingPlan !== null}
                 className="mt-5 w-full rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold text-white transition-all hover:bg-white/20 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -583,7 +634,7 @@ export default function Home() {
               </ul>
               <button
                 type="button"
-                onClick={() => handleBuy("pack_3", PACK_3_ID)}
+                onClick={() => requestBuy("pack_3", PACK_3_ID)}
                 disabled={buyingPlan !== null}
                 className="group mt-5 w-full overflow-hidden rounded-xl bg-gradient-to-l from-[#7b2ff7] via-[#d4148c] to-[#f72585] py-3 text-sm font-bold text-white shadow-lg shadow-fuchsia-900/40 transition-all hover:scale-[1.02] active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -615,7 +666,7 @@ export default function Home() {
               </ul>
               <button
                 type="button"
-                onClick={() => handleBuy("pack_30", PACK_30_ID)}
+                onClick={() => requestBuy("pack_30", PACK_30_ID)}
                 disabled={buyingPlan !== null}
                 className="mt-5 w-full rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold text-white transition-all hover:bg-white/20 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -634,6 +685,57 @@ export default function Home() {
 
         </div>{/* /inner max-w container */}
       </div>
+
+      {/* ── Checkout notice: Polar's page is in English ─────────────────────── */}
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) setPendingPlan(null);
+        }}
+        open={pendingPlan !== null}
+      >
+        <DialogContent
+          className="max-w-[calc(100%-2rem)] rounded-3xl border border-fuchsia-400/40 bg-gradient-to-br from-[#2d0a4e] via-[#3b0764] to-[#1e0736] p-6 text-white sm:max-w-md"
+          dir="rtl"
+          hideCloseButton
+          style={{ fontFamily: t.font }}
+        >
+          <DialogHeader className="text-right sm:text-right">
+            <DialogTitle className="font-bold text-fuchsia-200 text-xl">
+              {t.checkoutNoticeTitle}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm text-white/80 leading-relaxed">
+              {t.checkoutNoticeBody}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ul className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 text-right">
+            {t.checkoutNoticeSteps.map((step) => (
+              <li className="text-sm text-white/85 leading-snug" key={step}>
+                {step}
+              </li>
+            ))}
+          </ul>
+
+          <p className="text-right text-white/60 text-xs">{t.checkoutNoticeSecure}</p>
+
+          <div className="flex flex-col gap-2">
+            <button
+              className="w-full rounded-xl bg-gradient-to-l from-[#7b2ff7] via-[#d4148c] to-[#f72585] py-3 font-bold text-sm text-white shadow-lg shadow-fuchsia-900/40 transition-all hover:scale-[1.02] active:scale-[0.97]"
+              onClick={confirmBuy}
+              type="button"
+            >
+              {t.checkoutNoticeContinue}
+            </button>
+            <button
+              className="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 font-medium text-sm text-white/80 transition-all hover:bg-white/20 active:scale-95"
+              onClick={() => setPendingPlan(null)}
+              type="button"
+            >
+              {t.checkoutNoticeCancel}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

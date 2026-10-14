@@ -30,12 +30,12 @@ type PremiumGateProps = {
 export default function PremiumGate({ children, forcePreview }: PremiumGateProps) {
   const user = useQuery(api.users.getCurrentUser);
   const updateUserType = useMutation(api.users.updateUserType);
-  const resetAllToFree = useMutation(api.users.resetAllUsersToFreePublic);
 
   // יתרת הקרדיטים של החבילה שנרכשה
   const credits = useQuery(api.credits.getMyCredits);
   // מספר האבחונים שכבר בוצעו — קובע אם המכסה החינמית עדיין זמינה
-  const formulaCount = useQuery(api.formulas.getCount);
+  // כולל אבחון חינמי שנוצל בחשבון קודם עם אותו אימייל שנמחק
+  const freeUsed = useQuery(api.formulas.getFreeDiagnosisUsed);
 
   const [paywallOpen, setPaywallOpen] = useState(false);
 
@@ -48,9 +48,9 @@ export default function PremiumGate({ children, forcePreview }: PremiumGateProps
     const isMockPaid = MOCK_PAYMENTS && user?.userType === "paid";
     const hasCredits = (credits?.remainingCredits ?? 0) > 0;
     // המכסה החינמית: אבחון ראשון אחד לכל משתמשת
-    const hasFreeDiagnosis = formulaCount === 0;
+    const hasFreeDiagnosis = freeUsed === false;
     return isMockPaid || hasCredits || hasFreeDiagnosis;
-  }, [user?.userType, credits?.remainingCredits, formulaCount]);
+  }, [user?.userType, credits?.remainingCredits, freeUsed]);
 
   // פתיחה אוטומטית של Paywall כשהעמוד "נעול"
   useEffect(() => {
@@ -82,38 +82,14 @@ export default function PremiumGate({ children, forcePreview }: PremiumGateProps
     return <>{children}</>;
   }
 
-  // כפתור איפוס — מופיע רק במצב MOCK (פיתוח/בדיקות)
-  const ResetButton = MOCK_PAYMENTS ? (
-    <button
-      type="button"
-      onClick={async () => {
-        const result = await resetAllToFree();
-        alert(`אופסו ${result.resetUsers} משתמשים, נמחקו ${result.deletedFormulas} נוסחאות — הדף יטען מחדש`);
-        window.location.reload();
-      }}
-      style={{
-        position: "fixed",
-        bottom: 12,
-        left: 12,
-        zIndex: 9999,
-        background: "#ef4444",
-        color: "#fff",
-        border: "none",
-        borderRadius: 8,
-        padding: "6px 14px",
-        fontSize: 13,
-        cursor: "pointer",
-        opacity: 0.85,
-      }}
-    >
-      🔄 איפוס משתמשים (בדיקות)
-    </button>
-  ) : null;
+  // כפתור האיפוס לבדיקות הוסר: הוא הפעיל את users.resetAllUsersToFreePublic,
+  // שהפך לפונקציה פנימית ולכן לא ניתן לקרוא לו מהדפדפן. איפוס מריצים מלוח
+  // הבקרה של Convex (Functions → users:resetAllUsersToFreePublic).
 
   // אם המשתמש או נתוני הגישה עדיין נטענים, נמתין.
-  // בלי ההמתנה על credits/formulaCount, משתמשת משלמת הייתה רואה הבזק של
+  // בלי ההמתנה על credits/freeUsed, משתמשת משלמת הייתה רואה הבזק של
   // ה-Paywall (וה-useEffect היה פותח אותו) לפני שהיתרה מגיעה מהשרת.
-  if (user === undefined || credits === undefined || formulaCount === undefined) {
+  if (user === undefined || credits === undefined || freeUsed === undefined) {
     return <div className="min-h-[60vh]" />; // מצב טעינה
   }
 
@@ -124,17 +100,11 @@ export default function PremiumGate({ children, forcePreview }: PremiumGateProps
 
   // אם המשתמש בתשלום, נציג את התוכן
   if (isPaid) {
-    return (
-      <>
-        {ResetButton}
-        {children}
-      </>
-    );
+    return <>{children}</>;
   }
 
   return (
     <>
-      {ResetButton}
       <PaywallModal
         onMockUpgradeToPaid={handleMockUpgradeToPaid}
         onOpenChange={setPaywallOpen}

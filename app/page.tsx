@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Crown,
   FlaskConical,
+  Gift,
   ShoppingBag,
   Sparkles,
   Star,
@@ -46,6 +47,11 @@ const translations = {
     paywallTitle: "ניצלת את האבחון החינמי שלך!",
     paywallBody:
       "כדי להמשיך ולקבל נוסחאות צבע וכימיה מדויקות ללא הגבלה, אנא בחרי את אחד ממסלולי הפרימיום שלנו למטה.",
+    freeGiftTitle: "🎁 מתנת הצטרפות: אבחון אחד בחינם!",
+    freeGiftSub: "האבחון הראשון שלך עלינו. לחצי על \"התחילי אבחון\" כדי לנצל אותו.",
+    freeGiftGuestSub: "הירשמי עכשיו וקבלי את האבחון הראשון שלך בחינם.",
+    freeUsedTitle: "ניצלת כבר את האבחון החינמי",
+    freeUsedSub: "לאבחונים נוספים, בחרי חבילה ←",
     packagesTitle: "הצעת חבילות",
     packagesSub: "בחרי את המסלול המתאים לך",
     upgradeBtn: "שדרגי עכשיו",
@@ -79,6 +85,11 @@ const translations = {
     paywallTitle: "لقد استخدمتِ تشخيصكِ المجاني!",
     paywallBody:
       "للمتابعة والحصول على تركيبات ألوان وكيمياء دقيقة بلا حدود، يرجى اختيار إحدى خطط بريميوم أدناه.",
+    freeGiftTitle: "🎁 هدية التسجيل: تشخيص واحد مجاناً!",
+    freeGiftSub: "تشخيصكِ الأول علينا. اضغطي على \"ابدئي التشخيص\" للاستفادة منه.",
+    freeGiftGuestSub: "سجّلي الآن واحصلي على تشخيصكِ الأول مجاناً.",
+    freeUsedTitle: "لقد استخدمتِ التشخيص المجاني بالفعل",
+    freeUsedSub: "لمزيد من التشخيصات، اختاري باقة ←",
     packagesTitle: "عروض الباقات",
     packagesSub: "اختاري الخطة المناسبة لكِ",
     upgradeBtn: "ترقية الآن",
@@ -136,7 +147,8 @@ export default function Home() {
 
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { signOut } = useAuthActions();
-  const formulaCount = useQuery(api.formulas.getCount);
+  // כולל אבחון חינמי שנוצל בחשבון קודם עם אותו אימייל שנמחק
+  const freeUsed = useQuery(api.formulas.getFreeDiagnosisUsed);
   const latestFormula = useQuery(api.formulas.getLatest);
   const currentUser = useQuery(api.users.getCurrentUser);
   const credits = useQuery(api.credits.getMyCredits);
@@ -157,12 +169,19 @@ export default function Home() {
     }
   }, [showPaywallAlert]);
 
-  const isCountLoading = isAuthenticated && formulaCount === undefined;
+  const isCountLoading = isAuthenticated && freeUsed === undefined;
   // הגישה נקבעת לפי יתרת הקרדיטים בפועל, ולא לפי userType.
   // userType נשאר "paid" גם אחרי שהחבילה נוצלה, ולכן הוא לא מדד גישה תקף.
   const hasCredits = (credits?.remainingCredits ?? 0) > 0;
-  const isBlocked =
-    isAuthenticated && !hasCredits && typeof formulaCount === "number" && formulaCount >= 1;
+  const isBlocked = isAuthenticated && !hasCredits && freeUsed === true;
+  // האבחון החינמי עדיין פנוי — אותו תנאי שהשרת בודק ב-formulas.save
+  const hasFreeDiagnosis = isAuthenticated && !hasCredits && freeUsed === false;
+  // אורחת שעוד לא נרשמה — מציגים לה את מתנת ההצטרפות כתמריץ להרשמה
+  const isGuest = !authLoading && !isAuthenticated;
+
+  function scrollToPackages() {
+    packagesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   function handleLangSwitch() {
     setLang((l) => (l === "he" ? "ar" : "he"));
@@ -378,6 +397,48 @@ export default function Home() {
             </p>
           </div>
         </a>
+
+        {/* ── Free diagnosis gift — new users (and guests, as a sign-up incentive) ── */}
+        {(hasFreeDiagnosis || isGuest) && (
+          <div className="mt-6 flex items-center gap-3 rounded-2xl border border-emerald-400/40 bg-gradient-to-l from-emerald-500/15 via-teal-500/10 to-cyan-500/15 p-4 backdrop-blur-md shadow-lg shadow-emerald-900/20">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-400/30 bg-emerald-500/20">
+              <Gift className="h-5 w-5 text-emerald-300" />
+            </div>
+            <div className="flex-1 text-right">
+              <p className="font-bold text-emerald-200 text-base leading-snug">{t.freeGiftTitle}</p>
+              <p className="mt-0.5 text-sm text-white/70">
+                {isGuest ? t.freeGiftGuestSub : t.freeGiftSub}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Free diagnosis used — persistent blinking notice ─────────────────── */}
+        {isBlocked && !showPaywallAlert && (
+          <>
+            <style>{`
+              @keyframes freeUsedBlink {
+                0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(244,63,94,0); border-color: rgba(251,113,133,0.5); }
+                50% { opacity: 0.55; box-shadow: 0 0 28px 8px rgba(244,63,94,0.45); border-color: rgba(251,113,133,1); }
+              }
+              .free-used-blink { animation: freeUsedBlink 1.4s ease-in-out infinite; }
+              @media (prefers-reduced-motion: reduce) { .free-used-blink { animation: none; } }
+            `}</style>
+            <button
+              type="button"
+              onClick={scrollToPackages}
+              className="free-used-blink mt-6 flex w-full items-center gap-3 rounded-2xl border-2 border-rose-400/60 bg-gradient-to-l from-rose-600/30 via-pink-600/25 to-fuchsia-600/30 p-4 backdrop-blur-md"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-300/40 bg-rose-500/25">
+                <AlertTriangle className="h-5 w-5 text-rose-200" />
+              </div>
+              <div className="flex-1 text-right">
+                <p className="font-black text-lg text-white leading-snug">{t.freeUsedTitle}</p>
+                <p className="mt-0.5 font-semibold text-rose-200 text-sm">{t.freeUsedSub}</p>
+              </div>
+            </button>
+          </>
+        )}
 
         {/* CTA */}
         <div className="mt-6">

@@ -352,6 +352,31 @@ export const refundPhotoAnalysis = mutation({
   },
 });
 
+// ── איפוס מכסות לכל המשתמשות — לשימוש בבדיקות בלבד (dev) ────────────────────
+// מאפס ניצול (שאלות בוט, ניתוחי תמונה, קרדיטים) ומחזיר את כל המכסות למלאות,
+// בלי לגעת ב-totalCredits/botQuestionsTotal שנצברו מרכישות בפועל.
+export const resetAllUsageForTesting = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    let resetCount = 0;
+    for (const user of users) {
+      const bot = getBotQuota(user);
+      const credits = getUserCredits(user);
+      await ctx.db.patch(user._id, {
+        photoAnalysesUsed: 0,
+        botQuestionsUsed: 0,
+        botQuestionsRemaining: bot.total,
+        usedCredits: 0,
+        remainingCredits: credits.totalCredits,
+        updatedAt: Date.now(),
+      });
+      resetCount++;
+    }
+    return { resetCount };
+  },
+});
+
 // ── שליפת מכסת ניתוחי התמונה עבור ה-UI ──────────────────────────────────────
 export const getMyPhotoQuota = query({
   args: {},

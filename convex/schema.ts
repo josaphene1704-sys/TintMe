@@ -78,4 +78,12 @@ export default defineSchema({
     eventType: v.string(), // האירוע שגרם לזיכוי בפועל
     processedAt: v.number(),
   }).index("by_orderId", ["orderId"]),
+
+  // אימיילים שכבר ניצלו את האבחון החינמי ומחקו את החשבון
+  // מטרה: מחיקת חשבון והרשמה מחדש עם אותו אימייל לא תעניק אבחון חינמי נוסף.
+  // נשמר רק האימייל (מנורמל לאותיות קטנות) — בלי שום מידע אחר על המשתמשת.
+  freeDiagnosisClaims: defineTable({
+    email: v.string(),
+    claimedAt: v.number(),
+  }).index("by_email", ["email"]),
 });

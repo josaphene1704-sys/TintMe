@@ -65,10 +65,18 @@ function extractJson(text: string): unknown {
   }
 }
 
+// כשל שהוא שלנו ולא של המשתמשת — מפתח חסר, יתרת API שנגמרה, נפילת רשת.
+// 503 ולא 500 כדי שהקליינט יוכל להבדיל בינו לבין תמונה שלא ניתנת לקריאה:
+// "נסי שוב" הוא עצה טובה לתמונה מטושטשת ועצה גרועה לשירות שנפל.
+function serviceUnavailable(reason: string) {
+  console.error("Hair analysis unavailable:", reason);
+  return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
+}
+
 export async function POST(req: NextRequest) {
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexUrl) {
-    return NextResponse.json({ error: "Convex URL not configured" }, { status: 500 });
+    return serviceUnavailable("NEXT_PUBLIC_CONVEX_URL missing");
   }
 
   const token = await convexAuthNextjsToken();
@@ -111,7 +119,7 @@ export async function POST(req: NextRequest) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 500 });
+    return serviceUnavailable("ANTHROPIC_API_KEY missing");
   }
 
   // ניתוח תמונה חינם עד FREE_PHOTO_ANALYSES, ורק אחר כך גורע שאלת בוט.
@@ -175,9 +183,10 @@ export async function POST(req: NextRequest) {
       freeTotal: quota.freeTotal,
     });
   } catch (err) {
+    // כאן נוחתת גם יתרת Anthropic שנגמרה וגם מפתח פסול — שתיהן תקלות תשתית
+    // שלנו, ולא סיבה לבקש מהלקוחה לצלם שוב.
     const message = err instanceof Error ? err.message : String(err);
-    console.error("Hair analysis error:", message);
     await convex.mutation(api.credits.refundPhotoAnalysis, { source: quota.source });
-    return NextResponse.json({ error: "Internal server error", detail: message }, { status: 500 });
+    return serviceUnavailable(message);
   }
 }

@@ -41,7 +41,11 @@ const T = {
     fromBot: (n: number) => `נגמרו הניתוחים החינמיים — יגרע משאלות הבוט (${n} נותרו)`,
     errGeneric: "הזיהוי נכשל. אפשר לנסות שוב או לבחור ידנית מהקטלוג.",
     errUnreadable: "לא הצלחתי לקרוא את התמונה. נסי תמונה ברורה יותר של השיער.",
+    errImage: "הקובץ הזה לא נתמך או גדול מדי. נסי תמונה אחרת (JPG או PNG).",
+    // תקלה אצלנו: אין טעם לבקש ממנה לצלם שוב, ואין טעם שתלחץ שוב ושוב.
+    errService: "שירות הזיהוי לא זמין כרגע — זו תקלה אצלנו, לא בתמונה שלך. בחרי גוון ידנית מהקטלוג ואפשר להמשיך רגיל.",
     errAuth: "יש להתחבר כדי לנתח תמונה.",
+    retrySmall: "נסי בכל זאת",
     warm: "בגוון חם",
     cool: "בגוון קר",
     neutral: "בגוון ניטרלי",
@@ -61,7 +65,10 @@ const T = {
     fromBot: (n: number) => `انتهت التحليلات المجانية — سيُخصم من أسئلة البوت (${n} متبقية)`,
     errGeneric: "فشل التعرف. يمكنك المحاولة مجدداً أو الاختيار يدوياً.",
     errUnreadable: "لم أتمكن من قراءة الصورة. جرّبي صورة أوضح للشعر.",
+    errImage: "هذا الملف غير مدعوم أو كبير جداً. جرّبي صورة أخرى (JPG أو PNG).",
+    errService: "خدمة التعرف غير متاحة حالياً — العطل عندنا وليس في صورتك. اختاري درجة يدوياً من الكتالوج وتابعي بشكل طبيعي.",
     errAuth: "يجب تسجيل الدخول لتحليل الصورة.",
+    retrySmall: "حاولي على أي حال",
     warm: "بدرجة دافئة",
     cool: "بدرجة باردة",
     neutral: "بدرجة محايدة",
@@ -69,6 +76,11 @@ const T = {
 } as const;
 
 type Status = "idle" | "loading" | "done" | "error";
+
+// "photo" = משהו שבידיים של הלקוחה (תמונה מטושטשת, פורמט לא נתמך, צריך להתחבר)
+// ולכן כפתור "נסי שוב" גדול הוא העצה הנכונה.
+// "service" = השירות אצלנו נפל, ולחיצה חוזרת רק תבזבז לה זמן.
+type ErrorKind = "photo" | "service";
 
 type PhotoQuota = { remaining: number; total: number; bot: { remaining: number } };
 
@@ -101,6 +113,7 @@ export function ShadeSuggestion({
   const [reading, setReading] = useState<ColorReading | null>(null);
   const [candidates, setCandidates] = useState<Shade[]>([]);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<ErrorKind>("photo");
 
   const analyze = useCallback(async () => {
     if (!photoDataUrl) return;
@@ -117,9 +130,22 @@ export function ShadeSuggestion({
 
       if (!res.ok) {
         setStatus("error");
-        if (res.status === 401 || res.status === 402) setErrorText(data.text ?? t.errAuth);
-        else if (res.status === 422) setErrorText(t.errUnreadable);
-        else setErrorText(t.errGeneric);
+        if (res.status === 503) {
+          setErrorKind("service");
+          setErrorText(t.errService);
+        } else if (res.status === 401 || res.status === 402) {
+          setErrorKind("photo");
+          setErrorText(data.text ?? t.errAuth);
+        } else if (res.status === 422) {
+          setErrorKind("photo");
+          setErrorText(t.errUnreadable);
+        } else if (res.status === 413 || data.error === "unsupported_image") {
+          setErrorKind("photo");
+          setErrorText(t.errImage);
+        } else {
+          setErrorKind("photo");
+          setErrorText(t.errGeneric);
+        }
         return;
       }
 
@@ -127,7 +153,9 @@ export function ShadeSuggestion({
       setCandidates((data.candidates ?? []) as Shade[]);
       setStatus("done");
     } catch {
+      // נפילת רשת בצד שלה — לחיצה חוזרת היא בהחלט עצה סבירה.
       setStatus("error");
+      setErrorKind("photo");
       setErrorText(t.errGeneric);
     }
   }, [photoDataUrl, mode, catalogId, t]);
@@ -136,10 +164,12 @@ export function ShadeSuggestion({
   if (!photoDataUrl) return null;
 
   const isLow = reading?.confidence === "low";
+  // כשהשירות נפל, ה-CTA הגדול היה מזמין לחיצות חוזרות שכולן ייכשלו באותו אופן.
+  const isServiceDown = status === "error" && errorKind === "service";
 
   return (
     <div className="mt-4 rounded-2xl border border-white/12 bg-black/20 p-3.5 backdrop-blur-sm">
-      {status !== "done" && (
+      {status !== "done" && !isServiceDown && (
         <button
           type="button"
           onClick={analyze}
@@ -166,10 +196,30 @@ export function ShadeSuggestion({
       )}
 
       {status === "error" && errorText && (
-        <p className="mt-2.5 flex items-start gap-1.5 text-amber-300/90 text-xs leading-relaxed">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {errorText}
-        </p>
+        <div className={cn(isServiceDown ? "flex flex-col gap-1.5" : "mt-2.5")}>
+          <p
+            className={cn(
+              "flex items-start gap-1.5 text-xs leading-relaxed",
+              isServiceDown
+                ? "rounded-lg bg-amber-500/10 px-2.5 py-2 text-amber-200/90"
+                : "text-amber-300/90",
+            )}
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {errorText}
+          </p>
+          {/* לא חוסמים אותה לגמרי: אם זו הייתה תקלה חולפת, יש דרך חזרה — רק לא
+              ככפתור הפעולה הראשי. */}
+          {isServiceDown && (
+            <button
+              type="button"
+              onClick={analyze}
+              className="self-start font-medium text-[11px] text-white/45 underline-offset-2 hover:text-white/70 hover:underline"
+            >
+              {t.retrySmall}
+            </button>
+          )}
+        </div>
       )}
 
       {status === "done" && reading && (
@@ -216,7 +266,7 @@ export function ShadeSuggestion({
 
       {/* המונה מודיע מראש כשהניתוח הבא כבר לא חינמי, כדי שהלקוחה לא תגלה
           בדיעבד ששאלת בוט נגרעה ממנה. */}
-      {quota && status !== "done" && (
+      {quota && status !== "done" && !isServiceDown && (
         <p className="mt-2 text-center text-[11px] text-white/35">
           {quotaLabel(t, quota)}
         </p>

@@ -324,17 +324,18 @@ function ColorCatalog({
 export default function PhotoAndColorPage() {
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
-  const formulaCount = useQuery(api.formulas.getCount);
+  // כולל אבחון חינמי שנוצל בחשבון קודם עם אותו אימייל שנמחק
+  const freeUsed = useQuery(api.formulas.getFreeDiagnosisUsed);
   const currentUser = useQuery(api.users.getCurrentUser);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (formulaCount === undefined || currentUser === undefined) return;
+    if (freeUsed === undefined || currentUser === undefined) return;
     const isPaid = currentUser?.userType === "paid";
-    if (!isPaid && formulaCount >= 1) {
+    if (!isPaid && freeUsed === true) {
       router.replace("/");
     }
-  }, [isAuthenticated, formulaCount, currentUser, router]);
+  }, [isAuthenticated, freeUsed, currentUser, router]);
 
   const [lang, setLang]                 = useState<Lang>("he");
   const [photo, setPhoto]               = useState<{ file: File; preview: string } | null>(null);

@@ -1,6 +1,7 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthSessionId, getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { hasUsedFreeDiagnosis, normalizeEmail } from "./formulas";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 
 // Internal query לשליפת המשתמש הנוכחי עבור Polar Component
@@ -45,13 +46,15 @@ export const getCurrentUser = query({
 });
 
 // שליפת משתמש לפי מזהה (ID)
-export const getById = query({
+// פנימי: כ-query ציבורי כל אחד יכול היה לשלוף פרטים (כולל אימייל) של כל משתמשת.
+export const getById = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => await ctx.db.get(userId),
 });
 
 // שליפת רשימת כל המשתמשים הפעילים
-export const listActive = query({
+// פנימי: כ-query ציבורי זו הייתה רשימת אימיילים של כל הלקוחות, פתוחה לכל אחד.
+export const listActive = internalQuery({
   args: {},
   handler: async (ctx) =>
     await ctx.db
@@ -103,14 +106,15 @@ export const createOrUpdateUser = mutation({
 });
 
 // עדכון פרופיל המשתמש (למשל, שינוי שם)
+// המזהה נלקח מההתחברות ולא מהדפדפן — אחרת כל משתמשת מחוברת יכלה לשנות
+// פרטים של משתמשת אחרת ע"י שליחת userId זר.
 export const updateProfile = mutation({
   args: {
-    userId: v.id("users"),
     fullName: v.optional(v.string()),
   },
-  handler: async (ctx, { userId, fullName }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+  handler: async (ctx, { fullName }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       throw new Error("Not authenticated");
     }
 
@@ -123,15 +127,12 @@ export const updateProfile = mutation({
   },
 });
 
-// מחיקת משתמש (פעולה למנהלים או למשתמש עצמו)
-export const remove = mutation({
+// מחיקת משתמש לפי מזהה (פעולת מנהלת)
+// פנימי: כ-mutation ציבורי כל משתמשת מחוברת יכלה למחוק חשבון של אחרת.
+// מריצים מלוח הבקרה של Convex בלבד.
+export const remove = internalMutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
     await ctx.db.delete(userId);
   },
 });
@@ -213,8 +214,10 @@ export const resetAllUsersToFree = internalMutation({
   },
 });
 
-// wrapper ציבורי — מאפס userType ל-free ומוחק את כל הנוסחאות (לבדיקות)
-export const resetAllUsersToFreePublic = mutation({
+// מאפס userType ל-free ומוחק את כל הנוסחאות (לבדיקות)
+// פנימי בכוונה: כ-mutation ציבורי כל אחד יכול היה להפעיל אותו מהדפדפן, גם בלי
+// להתחבר, ולמחוק את כל האבחונים. מריצים מלוח הבקרה של Convex בלבד (Functions).
+export const resetAllUsersToFreePublic = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
@@ -243,7 +246,8 @@ export const resetAllUsersToFreePublic = mutation({
 
 // מוחק את כל האבחונים (formulas) וכל הלקוחות (users)
 // לאחר המחיקה, כל מי שנרשם מחדש יקבל אבחון חינמי אחד
-export const clearAllData = mutation({
+// פנימי בכוונה — מאותה סיבה כמו resetAllUsersToFreePublic. מריצים מלוח הבקרה בלבד.
+export const clearAllData = internalMutation({
   args: {},
   handler: async (ctx) => {
     // מחיקת כל הנוסחאות/אבחונים
@@ -274,26 +278,82 @@ export const clearAllData = mutation({
 export const deleteMyAccount = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    // getAuthUserId ולא identity.subject: ה-subject הוא "userId|sessionId",
+    // ולכן ההשוואה שלו ל-_id לא מצאה אף פעם את המשתמשת — והמחיקה "הצליחה"
+    // בלי למחוק כלום.
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       throw new Error("לא מחובר למערכת");
     }
-
-    // קבלת מזהה המשתמש מה-identity
-    const userId = identity.subject;
+    const currentSessionId = await getAuthSessionId(ctx);
     let deletedCount = 0;
 
-    // מחיקת המשתמש מטבלת המשתמשים
-    // הערה: Convex Auth מנהל את טבלת המשתמשים, אך אנחנו יכולים למחוק את הרשומה
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("_id"), userId))
-      .first();
-
-    if (user) {
-      await ctx.db.delete(user._id);
-      deletedCount += 1;
+    // 0. אם האבחון החינמי נוצל — שומרים את האימייל, כדי שהרשמה מחדש איתו
+    // לא תעניק אבחון חינמי נוסף. חייב לרוץ לפני מחיקת האבחונים והמשתמשת,
+    // כי hasUsedFreeDiagnosis נשען על שניהם.
+    const user = await ctx.db.get(userId);
+    if (user?.email && (await hasUsedFreeDiagnosis(ctx, userId))) {
+      const email = normalizeEmail(user.email);
+      const alreadyClaimed = await ctx.db
+        .query("freeDiagnosisClaims")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+      if (!alreadyClaimed) {
+        await ctx.db.insert("freeDiagnosisClaims", { email, claimedAt: Date.now() });
+      }
     }
+
+    // 1. האבחונים השמורים
+    const formulas = await ctx.db
+      .query("formulas")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const formula of formulas) {
+      await ctx.db.delete(formula._id);
+      deletedCount++;
+    }
+
+    // 2. חשבונות ההתחברות (סיסמה / Google) וקודי האימות שלהם.
+    // בלעדיהם האימייל נשאר "תפוס" ולא ניתן להירשם איתו מחדש.
+    const accounts = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) => q.eq("userId", userId))
+      .collect();
+    for (const account of accounts) {
+      const codes = await ctx.db
+        .query("authVerificationCodes")
+        .withIndex("accountId", (q) => q.eq("accountId", account._id))
+        .collect();
+      for (const code of codes) {
+        await ctx.db.delete(code._id);
+      }
+      await ctx.db.delete(account._id);
+      deletedCount++;
+    }
+
+    // 3. התחברויות פעילות במכשירים אחרים. את ההתחברות הנוכחית משאירים —
+    // ה-signOut שהלקוח מריץ מיד אחר כך מוחק אותה בצורה מסודרת.
+    const sessions = await ctx.db
+      .query("authSessions")
+      .withIndex("userId", (q) => q.eq("userId", userId))
+      .collect();
+    for (const session of sessions) {
+      if (session._id === currentSessionId) continue;
+      const tokens = await ctx.db
+        .query("authRefreshTokens")
+        .withIndex("sessionId", (q) => q.eq("sessionId", session._id))
+        .collect();
+      for (const token of tokens) {
+        await ctx.db.delete(token._id);
+      }
+      await ctx.db.delete(session._id);
+    }
+
+    // 4. רשומת המשתמשת עצמה.
+    // polarOrders לא נמחקות בכוונה: הן תיעוד חשבונאי, ומשמשות למניעת זיכוי
+    // כפול אם Polar ישלח שוב webhook על הזמנה ישנה.
+    await ctx.db.delete(userId);
+    deletedCount++;
 
     return {
       success: true,
